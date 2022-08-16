@@ -1,0 +1,27 @@
+---
+services:
+  postgres:
+    container_name: nyec_postgres
+    image: nyec_postgres:latest
+    build:
+      context: ./docker_postgres/
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: postgres
+      DOCKER_DEFAULT_PLATFORM: linux/amd64
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    restart: always
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres-db-volume:
