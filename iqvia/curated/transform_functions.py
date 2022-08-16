@@ -178,7 +178,7 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
 
 def to_admitting_diagnosis(claim_rdd: RDD) -> RDD:
     return claim_rdd.filter(lambda r: r.ADMS_DIAG_CD is not None)\
-                    .map(lambda r: Row(**_to_admitting_diagnosis(r)))\
+                    .map(lambda r: _to_admitting_diagnosis(r))\
                     .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
@@ -384,21 +384,3 @@ def to_practitioner_row(claim_rdd: RDD) -> RDD:
 
 def to_practitioner_role_row(practitioner_rdd: RDD) -> RDD:
     pass
-
-
-def save_errors(rdd: RDD, row_type: str):
-    rdd.filter(lambda r: r.is_valid == False) \
-        .map(lambda r: Row(batch_id=r.batch_id,
-                           type=row_type,
-                           row_errors=json.dumps(r.error),
-                           row_value=json.dumps(r.asDict()),
-                           date_created=datetime.now())) \
-        .toDF(error_schema) \
-        .write.format("jdbc") \
-        .option("url", "jdbc:postgresql://localhost:5432/postgres") \
-        .option("driver", "org.postgresql.Driver") \
-        .option("dbtable", "public.error") \
-        .option("user", "postgres") \
-        .option("password", "mysecretpassword") \
-        .mode("append") \
-        .save()

@@ -1,4 +1,5 @@
 from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 
 
@@ -72,8 +73,8 @@ def load_provider(spark: SparkSession, load_path: str, schema: StructType):
     return load_df(spark, load_path, schema)
 
 
-def load_renderingprovider(spark: SparkSession, load_path: str, schema: StructType):
-    return load_provider(spark, load_path, schema) \
+def load_rendering_provider(provider_raw: DataFrame):
+    return provider_raw \
         .select(col('PROVIDER_ID').alias('RENDERING_PROVIDER_ID_REF'),
                 col('PROVIDER_TYP_ID').alias('RENDERING_PROVIDER_TYP_ID'),
                 col('ORG_NM').alias('RENDERING_ORG_NM'),
@@ -91,8 +92,8 @@ def load_renderingprovider(spark: SparkSession, load_path: str, schema: StructTy
                 col('NPI').alias('RENDERING_NPI'))
 
 
-def load_referring_provider(spark: SparkSession, load_path: str, schema: StructType):
-    return load_provider(spark, load_path, schema) \
+def load_referring_provider(provider_raw: DataFrame):
+    return provider_raw \
         .select(col('PROVIDER_ID').alias('REFERRING_PROVIDER_ID_REF'),
                 col('PROVIDER_TYP_ID').alias('REFERRING_PROVIDER_TYP_ID'),
                 col('ORG_NM').alias('REFERRING_ORG_NM'),

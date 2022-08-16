@@ -1,6 +1,9 @@
-from functions import *
+from transform_functions import *
+from save_functions import *
 from iqvia.common.load import *
 from iqvia.common.schema import *
+
+from pyspark import StorageLevel
 
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
@@ -10,14 +13,6 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 conf = spark.conf
-# --conf "spark.nyec.iqvia.plans_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/plans.csv"
-# --conf "spark.nyec.iqvia.diags_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/diagnosis.csv"
-# --conf "spark.nyec.iqvia.procs_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/procedure.csv"
-# --conf "spark.nyec.iqvia.drugs_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/drug.csv"
-# --conf "spark.nyec.iqvia.proc_mod_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/proc_modfier.csv"
-# --conf "spark.nyec.iqvia.providers_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/provider.csv"
-# --conf "spark.nyec.iqvia.claims_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/facts_dx.csv"
-# --conf "spark.nyec.iqvia.patients_ingest_path=/Users/emmanuel.bacolas/tmp/iqvia_data/patients.csv"
 
 plan_path = conf.get("spark.nyec.iqvia.plans_ingest_path")
 patient_path = conf.get("spark.nyec.iqvia.patients_ingest_path")
@@ -29,214 +24,67 @@ drug_path = conf.get("spark.nyec.iqvia.drugs_ingest_path")
 provider_path = conf.get("spark.nyec.iqvia.providers_ingest_path")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
 # pro_provider_path = conf.get("spark.nyec.iqvia.pro_provider_ingest_path")
-# "s3a://sparkbyexamples/csv/zipcodes.csv"
-#
-# spark.sparkContext
-#      .hadoopConfiguration.set("fs.s3a.access.key", "awsaccesskey value")
-# service)
-#  // Replace Key with your AWS secret key (You can find this on IAM
-# spark.sparkContext
-#      .hadoopConfiguration.set("fs.s3a.secret.key", "aws secretkey value")
-# spark.sparkContext
-#       .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
-# spark._jsc.hadoopConfiguration().set("fs.s3a.access.key", "mykey")
-# spark._jsc.hadoopConfiguration().set("fs.s3a.secret.key", "mysecret")
-# spark._jsc.hadoopConfiguration().set("fs.s3a.impl","org.apache.hadoop.fs.s3a.S3AFileSystem")
-# spark._jsc.hadoopConfiguration().set("com.amazonaws.services.s3.enableV4", "true")
-# spark._jsc.hadoopConfiguration().set("fs.s3a.aws.credentials.provider","org.apache.hadoop.fs.s3a.BasicAWSCredentialsProvider")
-# spark._jsc.hadoopConfiguration().set("fs.s3a.endpoint", "eu-west-3.amazonaws.com")
 
 
 ### create data frames
 org_data = [("IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
-raw_df = load_plan(spark, plan_path, raw_plan_schema)
-plan_raw = raw_df.withColumn('org_type', lit('THIRD PARTY CLAIMS AGGREGATOR')).withColumn('plan_status', lit(True))
-
-patient_raw = spark.read.schema(raw_patient_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(patient_path) \
-    .withColumn('consumer_type', lit('MEMBER')) \
-    .withColumn('consumer_status', lit(True)) \
-    .withColumn('source_org_oid', lit('IQVIA')) \
-    .withColumn('batch_id', lit(batch_id))
-
-claim_raw = spark.read.schema(raw_claim_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(claim_path) \
-    .withColumn("PATIENT_ID_CLAIM", col("PATIENT_ID")) \
-    .withColumn('source_org_oid', lit('IQVIA')) \
-    .drop(col("PATIENT_ID"))
-
-proc_raw = spark.read.schema(raw_procedure_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(procedure_path)
-
-proc_modifier_raw = spark.read.schema(raw_procedure_modifier_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(proc_modifier_path)
-
-proc_modifier_raw_1 = proc_modifier_raw \
-    .select(col('PRC_MODR_CD').alias('PRC1_MODR_CD'), col('PRC_MODR_DESC').alias('PRC1_MODR_DESC'))
-
-proc_modifier_raw_2 = proc_modifier_raw \
-    .select(col('PRC_MODR_CD').alias('PRC2_MODR_CD'), col('PRC_MODR_DESC').alias('PRC2_MODR_DESC'))
-
-proc_modifier_raw_3 = proc_modifier_raw \
-    .select(col('PRC_MODR_CD').alias('PRC3_MODR_CD'), col('PRC_MODR_DESC').alias('PRC3_MODR_DESC'))
-
-proc_modifier_raw_4 = proc_modifier_raw \
-    .select(col('PRC_MODR_CD').alias('PRC4_MODR_CD'), col('PRC_MODR_DESC').alias('PRC4_MODR_DESC'))
-
-diag_raw = spark.read.schema(raw_diag_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(diagnosis_path)
-
-drug_raw = spark.read.schema(raw_drug_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(drug_path)
-
-provider_raw = spark.read.schema(raw_provider_schema) \
-    .options(inferSchema=False, delimiter=',', header=True) \
-    .csv(provider_path)
-
-rendering_provider_raw = provider_raw \
-    .select(col('PROVIDER_ID').alias('RENDERING_PROVIDER_ID_REF'),
-            col('PROVIDER_TYP_ID').alias('RENDERING_PROVIDER_TYP_ID'),
-            col('ORG_NM').alias('RENDERING_ORG_NM'),
-            col('IMS_RXER_ID').alias('RENDERING_IMS_RXER_ID'),
-            col('LAST_NM').alias('RENDERING_LAST_NM'),
-            col('FIRST_NM').alias('RENDERING_FIRST_NM'),
-            col('ADDR_LINE1_TXT').alias('RENDERING_ADDR_LINE1_TXT'),
-            col('ADDR_LINE2_TXT').alias('RENDERING_ADDR_LINE2_TXT'),
-            col('CITY_NM').alias('RENDERING_CITY_NM'),
-            col('ST_CD').alias('RENDERING_ST_CD'),
-            col('ZIP').alias('RENDERING_ZIP'),
-            col('PRI_SPCL_CD').alias('RENDERING_PRI_SPCL_CD'),
-            col('PRI_SPCL_DESC').alias('RENDERING_PRI_SPCL_DESC'),
-            col('ME_NBR').alias('RENDERING_ME_NBR'),
-            col('NPI').alias('RENDERING_NPI'))
-
-referring_provider_raw = provider_raw \
-    .select(col('PROVIDER_ID').alias('REFERRING_PROVIDER_ID_REF'),
-            col('PROVIDER_TYP_ID').alias('REFERRING_PROVIDER_TYP_ID'),
-            col('ORG_NM').alias('REFERRING_ORG_NM'),
-            col('IMS_RXER_ID').alias('REFERRING_IMS_RXER_ID'),
-            col('LAST_NM').alias('REFERRING_LAST_NM'),
-            col('FIRST_NM').alias('REFERRING_FIRST_NM'),
-            col('ADDR_LINE1_TXT').alias('REFERRING_ADDR_LINE1_TXT'),
-            col('ADDR_LINE2_TXT').alias('REFERRING_ADDR_LINE2_TXT'),
-            col('CITY_NM').alias('REFERRING_CITY_NM'),
-            col('ST_CD').alias('REFERRING_ST_CD'),
-            col('ZIP').alias('REFERRING_ZIP'),
-            col('PRI_SPCL_CD').alias('REFERRING_PRI_SPCL_CD'),
-            col('PRI_SPCL_DESC').alias('REFERRING_PRI_SPCL_DESC'),
-            col('ME_NBR').alias('REFERRING_ME_NBR'),
-            col('NPI').alias('REFERRING_NPI'))
-
-# pro_provider_raw = spark.read.schema(raw_pro_provider_schema)\
-#                     .options(inferSchema=False,delimiter=',', header=True)\
-#                     .csv(pro_provider_path)\
-#                     .persist(StorageLevel.MEMORY_AND_DISK)
+raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
+raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
+raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
+raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema)
+raw_proc_mod_3_df = load_procedure_modifier3(spark, proc_modifier_path, raw_procedure_modifier_schema)
+raw_proc_mod_4_df = load_procedure_modifier4(spark, proc_modifier_path, raw_procedure_modifier_schema)
+raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
+raw_drug_df = load_diagnosis(spark, drug_path, raw_drug_schema)
+provider_raw = load_provider(spark, provider_path, raw_provider_schema)
+raw_rendering_provider_df = load_rendering_provider(provider_raw)
+raw_referring_provider_df = load_referring_provider(provider_raw)
 ### end of create data frames
 
-### create org
-org_df.write.parquet('/tmp/org', mode='overwrite')
 
-### create patient
-patient_rdd = patient_raw.rdd.persist(StorageLevel.MEMORY_AND_DISK)
-currated_patient_df = to_patient(patient_rdd).toDF(stage_patient_schema)
-
-valid_patients_df = currated_patient_df.filter(currated_patient_df.is_valid==True)\
-                                       .select(col('source_consumer_id'),
-                                               col('source_org_oid'),
-                                               col('type'),
-                                               col('active'),
-                                               col('dob'),
-                                               col('gender'),
-                                               col('batch_id'))
-
-valid_patients_df.write.parquet('/tmp/patients', mode='overwrite')
-
+### create stage patient DF
+patient_rdd = raw_patient_df.rdd.persist(StorageLevel.MEMORY_AND_DISK)
+currated_patient_df = to_patient(patient_rdd).toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
+save_patient(currated_patient_df, '')
 save_errors(patient_rdd, PATIENT)
-
-# currated_patient_df.filter(currated_patient_df.is_valid==False)\
-#                     .write.format("jdbc")\
-#                     .option("url", "jdbc:postgresql://localhost:5432/postgres") \
-#                     .option("driver", "org.postgresql.Driver")\
-#                     .option("dbtable", "public.error") \
-#                     .option("user", "postgres")\
-#                     .option("password", "mysecretpassword")\
-#                     .mode("append")\
-#                     .save()
+patient_rdd.unpersist()
+currated_patient_df.unpersist()
 
 ### create clinical events
-patient_claims_raw = patient_raw.join(claim_raw, on=[claim_raw.PATIENT_ID_CLAIM == patient_raw.PATIENT_ID], how="inner") \
-    .join(plan_raw, on=[claim_raw.PLAN_ID == plan_raw.PLAN_ID], how="left_outer") \
-    .join(diag_raw, on=[claim_raw.DIAG_CD == diag_raw.DIAG_CD, claim_raw.DIAG_VERS_TYP_ID == diag_raw.DIAG_VERS_TYP_ID],
+patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
+    .join(raw_plan_df, on=[raw_claim_df.PLAN_ID == raw_plan_df.PLAN_ID], how="left_outer") \
+    .join(raw_diag_df, on=[raw_claim_df.DIAG_CD == raw_diag_df.DIAG_CD, raw_claim_df.DIAG_VERS_TYP_ID == raw_diag_df.DIAG_VERS_TYP_ID],
           how="left_outer") \
-    .join(proc_raw, on=[claim_raw.PRC_CD == proc_raw.PRC_CD, claim_raw.PRC_VERS_TYP_ID == proc_raw.PRC_VERS_TYP_ID],
+    .join(raw_proc_df, on=[raw_claim_df.PRC_CD == raw_proc_df.PRC_CD, raw_proc_df.PRC_VERS_TYP_ID == raw_proc_df.PRC_VERS_TYP_ID],
           how="left_outer") \
-    .join(proc_modifier_raw_1, on=[claim_raw.PRC1_MODR_CD == proc_modifier_raw_1.PRC1_MODR_CD], how="left_outer") \
-    .join(proc_modifier_raw_2, on=[claim_raw.PRC2_MODR_CD == proc_modifier_raw_2.PRC2_MODR_CD], how="left_outer") \
-    .join(proc_modifier_raw_3, on=[claim_raw.PRC3_MODR_CD == proc_modifier_raw_3.PRC3_MODR_CD], how="left_outer") \
-    .join(proc_modifier_raw_4, on=[claim_raw.PRC4_MODR_CD == proc_modifier_raw_4.PRC4_MODR_CD], how="left_outer") \
-    .join(drug_raw, on=[claim_raw.NDC_CD == drug_raw.NDC_CD], how="left_outer") \
-    .join(rendering_provider_raw,
-          on=[claim_raw.RENDERING_PROVIDER_ID == rendering_provider_raw.RENDERING_PROVIDER_ID_REF], how="left_outer") \
-    .join(referring_provider_raw,
-          on=[claim_raw.REFERRING_PROVIDER_ID == referring_provider_raw.REFERRING_PROVIDER_ID_REF], how="left_outer") \
+    .join(raw_proc_mod_1_df, on=[raw_claim_df.PRC1_MODR_CD == raw_proc_mod_1_df.PRC1_MODR_CD], how="left_outer") \
+    .join(raw_proc_mod_2_df, on=[raw_claim_df.PRC2_MODR_CD == raw_proc_mod_2_df.PRC2_MODR_CD], how="left_outer") \
+    .join(raw_proc_mod_3_df, on=[raw_claim_df.PRC3_MODR_CD == raw_proc_mod_3_df.PRC3_MODR_CD], how="left_outer") \
+    .join(raw_proc_mod_4_df, on=[raw_claim_df.PRC4_MODR_CD == raw_proc_mod_4_df.PRC4_MODR_CD], how="left_outer") \
+    .join(raw_drug_df, on=[raw_claim_df.NDC_CD == raw_drug_df.NDC_CD], how="left_outer") \
+    .join(raw_rendering_provider_df,
+          on=[raw_claim_df.RENDERING_PROVIDER_ID == raw_rendering_provider_df.RENDERING_PROVIDER_ID_REF], how="left_outer") \
+    .join(raw_referring_provider_df,
+          on=[raw_claim_df.REFERRING_PROVIDER_ID == raw_referring_provider_df.REFERRING_PROVIDER_ID_REF], how="left_outer") \
     .withColumn('batch_id', lit(batch_id)) \
+    .rdd\
     .persist(StorageLevel.MEMORY_AND_DISK)
-# .repartition('PATIENT_ID')\
-
-claim_rdd = patient_claims_raw.rdd.persist(StorageLevel.MEMORY_AND_DISK)
 
 ### create procedure
-procedure_rdd = to_procedure(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-# stage_procs_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
+procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_rdd, PROCEDURE)
-# procedure_rdd.filter(lambda r: r.is_valid == False)\
-#                            .map(lambda r: Row(batch_id=r.batch_id,
-#                                                type='PROCEDURE',
-#                                                row_errors=json.dumps(r.error),
-#                                                row_value=json.dumps(r.asDict()),
-#                                                date_created=datetime.now()))\
-#                            .toDF(error_schema)\
-#                            .write.format("jdbc")\
-#                            .option("url", "jdbc:postgresql://localhost:5432/postgres") \
-#                            .option("driver", "org.postgresql.Driver")\
-#                            .option("dbtable", "public.error") \
-#                            .option("user", "postgres")\
-#                            .option("password", "mysecretpassword")\
-#                            .mode("append")\
-#                            .save()
+currated_proc_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-valid_procs = procedure_rdd.toDF(stage_procedure_schema)\
-                            .filter(col('is_valid') == True)\
-                            .select(col('source_consumer_id'),
-                                     col('source_org_oid'),
-                                     col('start_date'),
-                                     col('to_date'),
-                                     col('code'),
-                                     col('code_system'),
-                                     col('revenue_code'),
-                                     col('desc'),
-                                     col('source_desc'),
-                                     col('mod'),
-                                     col('batch_id'))\
-                            .persist(StorageLevel.MEMORY_AND_DISK)
+save_procedure(currated_proc_df)
+save_procedure_modifiers(currated_proc_df)
+save_procedure_modifiers(currated_proc_df)
+currated_proc_df.unpersist(False)
+procedure_rdd.unpersist(False)
 
-valid_procs.select(col('source_org_oid'),
-                   col('source_consumer_id'),
-                   col('start_date'),
-                   col('to_date'),
-                   col('code'),
-                   col('code_system'),
-                   col('mod'))\
-           .write.parquet('/tmp/procedures', mode='overwrite')
-# in_valid_rows.write.parquet(f's3a://bucket-name/iqvia/stage/{date.today()}test.parquet', mode='overwrite')
 
 
 

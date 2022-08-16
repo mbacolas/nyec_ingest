@@ -16,7 +16,6 @@ file_parsing_delimiter = conf.get("spark.nyec.file_delimiter", ',')
 dynamic_config = conf.get("spark.nyec.dynamic_config")
 dynamic_config_list = json.loads(dynamic_config)
 
-
 for cfg in dynamic_config_list:
     ingest_path = cfg.get('ingest_path')
     from_module = cfg.get('from')
