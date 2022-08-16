@@ -69,3 +69,20 @@ def save_procedure_modifiers(currated_procedure_df: DataFrame, output_path: str)
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'))\
         .write.parquet(output_path, mode='overwrite')
+
+
+def save_problem(currated_problem_df: DataFrame, output_path: str):
+    currated_problem_df.filter(currated_problem_df.is_valid == True) \
+        .select(col('source_consumer_id'),
+                col('source_org_oid'),
+                col('start_date'),
+                col('to_date'),
+                col('code'),
+                col('code_system'),
+                col('desc'),
+                col('source_desc'),
+                col('is_admitting'),
+                col('batch_id')) \
+        .repartition(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'))\
+        .write.parquet(output_path, mode='overwrite')

@@ -7,6 +7,8 @@ from pyspark import StorageLevel
 
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
+PROBLEM = 'PROBLEM'
+DRUG = 'DRUG'
 
 spark = SparkSession.builder \
     .appName("IQVIA Ingest") \
@@ -77,14 +79,25 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
 ### create procedure
 procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_rdd, PROCEDURE)
-currated_proc_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
+currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_procedure(currated_proc_df)
-save_procedure_modifiers(currated_proc_df)
-save_procedure_modifiers(currated_proc_df)
-currated_proc_df.unpersist(False)
+save_procedure(currated_df)
+save_procedure_modifiers(currated_df)
+save_procedure_modifiers(currated_df)
+currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
 
+### problems
+
+problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(problem_rdd, PROBLEM)
+currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
+
+save_problem(currated_df)
+
+currated_df.unpersist(False)
+problem_rdd.unpersist(False)
+####
 
 
 
@@ -104,7 +117,7 @@ patient_raw.join(claim_raw, on=[claim_raw.PATIENT_ID == patient_raw.PATIENT_ID],
 
 
 
-problem_rdd = to_problem(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+
 
 
 ############################ START DRUGS
