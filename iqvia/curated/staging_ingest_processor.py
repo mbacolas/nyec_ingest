@@ -83,12 +83,11 @@ currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.ME
 
 save_procedure(currated_df)
 save_procedure_modifiers(currated_df)
-save_procedure_modifiers(currated_df)
+
 currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
 
 ### problems
-
 problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(problem_rdd, PROBLEM)
 currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
@@ -99,7 +98,10 @@ currated_df.unpersist(False)
 problem_rdd.unpersist(False)
 ####
 
+### drug
 
+
+####
 
 patient_plan_rdd = patient_raw.join(claim_raw, on=[patient_raw.PLAN_ID == plan_raw.PLAN_ID], how="inner") \
     .rdd \
