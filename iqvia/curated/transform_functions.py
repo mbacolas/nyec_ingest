@@ -382,8 +382,6 @@ def to_claim(claim_raw: RDD) -> RDD:
 
 
 def _to_practitioner_row(claim_row: Row) -> Row:
-    # source_provider_id_result = is_null(claim_row.RENDERING_PROVIDER_ID_REF, 'RENDERING_PROVIDER_ID_REF')
-
     providers = []
 
     if claim_row.RENDERING_PROVIDER_ID is not None:
@@ -432,7 +430,7 @@ def _to_practitioner_row(claim_row: Row) -> Row:
     return providers
 
 
-def to_practitioner_row(claim_rdd: RDD) -> RDD:
+def to_practitioner(claim_rdd: RDD) -> RDD:
     return claim_rdd.flatMap(lambda r: _to_practitioner_row(r))
                     # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
 

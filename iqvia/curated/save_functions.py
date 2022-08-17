@@ -24,6 +24,12 @@ def save_errors(rdd: RDD, row_type: str):
         .mode("append") \
         .save()
 
+def save_org(org_df: DataFrame, output_path: str):
+    org_df.select(col('source_org_oid'),
+            col('name'),
+            col('type'),
+            col('active')) \
+        .write.parquet(output_path, mode='overwrite')
 
 def save_patient(currated_patient_df: DataFrame, output_path: str):
     currated_patient_df.filter(currated_patient_df.is_valid == True) \
@@ -166,3 +172,7 @@ def save_provider(currated_provider_df: DataFrame, output_path: str):
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
                               col('service_number'))\
         .write.parquet(output_path, mode='overwrite')
+
+
+def save_provider_role(currated_provider_df: DataFrame, output_path: str):
+    pass

@@ -11,6 +11,7 @@ PROBLEM = 'PROBLEM'
 DRUG = 'DRUG'
 COST = 'COST'
 CLAIM = 'CLAIM'
+PRACTIONER = 'PRACTIONER'
 
 spark = SparkSession.builder \
     .appName("IQVIA Ingest") \
@@ -140,19 +141,26 @@ save_claim(currated_df, '')
 
 currated_df.unpersist(False)
 claim_record_rdd.unpersist(False)
-
 ###
 
-
 ### org
-
-
+save_org(org_df, '')
+org_df.unpersist()
 ###
 
 
 ### provider
+practitioner_rdd = to_practitioner(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(practitioner_rdd, PRACTIONER)
+currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
+practitioner_role_rdd = currated_df.select(col('source_provider_id'), col('claim_identifier'), col('role'))
 
+save_pr(currated_df, '')
+save_provider(currated_df, '')
+
+currated_df.unpersist(False)
+practitioner_rdd.unpersist(False)
 ###
 
 

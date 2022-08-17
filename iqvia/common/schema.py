@@ -247,32 +247,33 @@ stage_claim_schema = StructType([
     StructField("id", StringType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
-
     StructField("payer_name", StringType()),
     StructField("payer_id", StringType()),
     StructField("plan_name", StringType()),
     StructField("plan_id", StringType()),
-
     StructField("claim_identifier", StringType()),
     StructField("service_number", StringType()),
     StructField("type", StringType()),
     StructField("sub_type", StringType()),
-
     StructField("start_date", DateType()),
     StructField("end_date", DateType()),
-
     StructField("admission_date", DateType()),
     StructField("discharge_date", DateType()),
-
     StructField("units_of_service", DateType()),
     StructField("facility_type_cd", DateType()),
     StructField("admission_source_cd", StringType()),
     StructField("admission_type_cd", StringType()),
     StructField("place_of_service", StringType()),
-
     StructField("error", ArrayType(StringType())),
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
     StructField("batch_id", StringType())
+])
+
+stage_provider_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("source_org_oid", StringType()),
+
 ])
