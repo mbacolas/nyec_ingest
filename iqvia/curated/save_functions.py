@@ -164,15 +164,22 @@ def save_claim(currated_claim_df: DataFrame, output_path: str):
 def save_provider(currated_provider_df: DataFrame, output_path: str):
     currated_provider_df.filter(currated_provider_df.is_valid == True) \
         .select(col('id'),
-                col('source_consumer_id'),
+                col('npi'),
                 col('source_org_oid'),
-
+                col('source_provider_id'),
+                col('provider_type'),
+                col('active'),
                 col('batch_id')) \
-        .repartition(col('source_org_oid'), col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
-                              col('service_number'))\
+        .repartition(col('npi'))\
         .write.parquet(output_path, mode='overwrite')
 
 
 def save_provider_role(currated_provider_df: DataFrame, output_path: str):
-    pass
+    currated_provider_df.filter(currated_provider_df.is_valid == True) \
+        .select(col('id'),
+                col('npi'),
+                col('claim_identifier'),
+                col('service_number'),
+                col('role'),
+                col('batch_id')) \
+        .write.parquet(output_path, mode='overwrite')

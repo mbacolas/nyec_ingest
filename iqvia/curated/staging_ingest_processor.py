@@ -156,23 +156,12 @@ currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.
 
 practitioner_role_rdd = currated_df.select(col('source_provider_id'), col('claim_identifier'), col('role'))
 
-save_pr(currated_df, '')
+save_provider_role(currated_df, '')
 save_provider(currated_df, '')
 
 currated_df.unpersist(False)
 practitioner_rdd.unpersist(False)
 ###
-
-
-patient_plan_rdd = patient_raw.join(claim_raw, on=[patient_raw.PLAN_ID == plan_raw.PLAN_ID], how="inner") \
-    .rdd \
-    .persist(StorageLevel.MEMORY_AND_DISK)
-
-
-eli_rdd = to_eligibility(patient_plan_rdd)
-
-patient_raw.join(claim_raw, on=[claim_raw.PATIENT_ID == patient_raw.PATIENT_ID], how="inner") \
-    .join(claim_raw, on=[claim_raw.PLAN_ID == plan_raw.PLAN_ID], how="inner")
 
 
 
@@ -184,47 +173,32 @@ patient_raw.join(claim_raw, on=[claim_raw.PATIENT_ID == patient_raw.PATIENT_ID],
 
 
 ############################ START DRUGS
-drug_rdd = to_drug(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-
-currated_drug_df=drug_rdd.toDF(stage_drug_schema)\
-                         .filter(col('is_valid')==True)\
-                         .select(col('source_consumer_id'),
-                             col('source_org_oid'),
-                             col('start_date'),
-                             col('to_date'),
-                             col('code'),
-                             col('code_system'),
-                             col('desc'),
-                             col('source_desc'),
-                             col('strength'),
-                             col('form'),
-                             col('classification'),
-                             col('batch_id'))\
-                         .persist(StorageLevel.MEMORY_AND_DISK)
-
+# drug_rdd = to_drug(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+#
+# currated_drug_df=drug_rdd.toDF(stage_drug_schema)\
+#                          .filter(col('is_valid')==True)\
+#                          .select(col('source_consumer_id'),
+#                              col('source_org_oid'),
+#                              col('start_date'),
+#                              col('to_date'),
+#                              col('code'),
+#                              col('code_system'),
+#                              col('desc'),
+#                              col('source_desc'),
+#                              col('strength'),
+#                              col('form'),
+#                              col('classification'),
+#                              col('batch_id'))\
+#                          .persist(StorageLevel.MEMORY_AND_DISK)
+#
 
 ############################ END  DRUGS
 
 
-errors.write.format("jdbc")\
-    .option("url", "jdbc:postgresql://localhost:5432/postgres") \
-    .option("driver", "org.postgresql.Driver")\
-    .option("dbtable", "public.error") \
-    .option("user", "postgres")\
-    .option("password", "mysecretpassword")\
-    .mode("append")\
-    .save()
 
-patient_claims_raw.unpersist(True)
-patient_claims_raw.count()
-a = patient_claims_raw.select('PATIENT_ID', 'REFERRING_PROVIDER_ID', 'REFERRING_LAST_NM',
-                              'REFERRING_PROVIDER_ID_REF').distinct().sort(col("REFERRING_PROVIDER_ID").asc())
-claim_rdd = patient_claims_raw.rdd
-proc_raw.join()
-proc_rdd = to_procedure(proc_raw.rdd)
-print(proc_rdd.first())
-
-df.write.parquet("s3a://bucket-name/shri/test.parquet", mode="overwrite")
+# a = patient_claims_raw.select('PATIENT_ID', 'REFERRING_PROVIDER_ID', 'REFERRING_LAST_NM',
+#                               'REFERRING_PROVIDER_ID_REF').distinct().sort(col("REFERRING_PROVIDER_ID").asc())
+# df.write.parquet("s3a://bucket-name/shri/test.parquet", mode="overwrite")
 
 # patient_claims_raw = patient_raw.join(claim_raw,patient_raw.PATIENT_ID == patient_raw.PATIENT_ID,"inner")
 #

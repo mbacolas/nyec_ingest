@@ -272,8 +272,26 @@ stage_claim_schema = StructType([
 ])
 
 stage_provider_schema = StructType([
-    StructField("id", StringType()),
-    StructField("source_consumer_id", StringType()),
+    StructField("npi", StringType()),
     StructField("source_org_oid", StringType()),
+    StructField("first_name", StringType()),
+    StructField("last_name", StringType()),
+    StructField("source_provider_id", StringType()),
+    StructField("provider_type", StringType()),
+    StructField("role", StringType()),
+    StructField("claim_identifier", StringType()),
+    StructField("service_number", StringType()),
+    StructField("active", StringType()),
+    StructField("error", ArrayType(StringType())),
+    StructField("warning", ArrayType(StringType())),
+    StructField("is_valid", BooleanType()),
+    StructField("has_warnings", BooleanType()),
+    StructField("batch_id", StringType())
+])
 
+stage_provider_role_schema = StructType([
+    StructField("npi", StringType()),
+    StructField("claim_identifier", StringType()),
+    StructField("service_number", StringType()),
+    StructField("role", StringType())
 ])
