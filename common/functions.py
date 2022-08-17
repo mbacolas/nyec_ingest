@@ -99,6 +99,7 @@ def is_null(obj: str, source_column_name: str) -> Either:
                  'source_column_value': obj}
         return Left(json.dumps(error))
 
+
 def to_claim_type(source_type: str) -> Either:
     if source_type == 'I':
         return Right('INSTITUTIONAL')

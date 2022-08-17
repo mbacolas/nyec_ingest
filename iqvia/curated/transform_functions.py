@@ -96,7 +96,7 @@ def _to_procedure_row(claim_row: Row) -> Row:
 def to_procedure(claim_rdd: RDD) -> RDD:
     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
                     .map(lambda r: _to_procedure_row(r))\
-                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
                     .reduceByKey((lambda a,b: a))\
                     .map(lambda r: r[1])
 
@@ -141,7 +141,7 @@ def _to_problem_row(claim_row: Row) -> Row:
 def to_problem(claim_rdd: RDD) -> RDD:
     return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
                     .map(lambda r: _to_problem_row(r))\
-                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
 
@@ -233,7 +233,7 @@ def to_drug(claim_rdd: RDD) -> RDD:
     return claim_rdd \
         .filter(lambda r: r.NDC_CD is not None) \
         .map(lambda r: _to_drug_row(r))\
-        .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+        .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
         .reduceByKey((lambda a, b: a))\
         .map(lambda r: r[1])
 
@@ -299,12 +299,12 @@ def to_eligibility(patient_plan_rdd: RDD) -> RDD:
 
 
 def _to_cost_row(claim_row: Row) -> Row:
-    row_id = uuid.uuid4().hex[:12]
     paid_amount_result = is_number(claim_row.SVC_CRGD_AMT)
     validation_errors = extract_left(*[paid_amount_result])
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
+    row_id = uuid.uuid4().hex[:12]
     cost_row = Row(id=row_id,
                    source_consumer_id=claim_row.PATIENT_ID,
                     source_org_oid=claim_row.source_org_oid,
@@ -322,11 +322,31 @@ def _to_cost_row(claim_row: Row) -> Row:
 
 def to_cost(claim_row_rdd: RDD) -> RDD:
     return claim_row_rdd.map(lambda r: _to_cost_row(r)) \
-                    .keyBy(lambda r: (r.source_consumer_id, r.claim_identifier, r.service_number, r.paid_amount)) \
+                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier, r.service_number, r.paid_amount)) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
 
-
+# claim_identifier
+# service_number
+# payer_name
+# type (institutional, professional) pharmacy, vision, dental?
+# sub_type (Inpatient vs Outpatient and/or a specialty service)
+# start_date
+# end_date
+# accident
+# accident_date
+# accident_type
+# date_submitted
+# date_processed
+# present_on_admision
+# admission_date
+# discharge_date
+# units_of_service
+# preauth_id
+# facility_type_cd
+# admission_source_cd
+# admission_type_cd
+# place_of_service
 def _to_claim_row(claim_row: Row) -> Row:
     source_claim_type = to_claim_type(claim_row.CLAIM_TYP_CD)
     admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT)
@@ -334,6 +354,7 @@ def _to_claim_row(claim_row: Row) -> Row:
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
+    row_id = uuid.uuid4().hex[:12]
     validation_errors = extract_left(*[source_claim_type,
                                        admission_date_result,
                                        discharge_date_result,
@@ -343,7 +364,8 @@ def _to_claim_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    diag_row = Row(source_consumer_id=claim_row.PATIENT_ID,
+    claim_stage_row = Row(id=row_id,
+                   source_consumer_id=claim_row.PATIENT_ID,
                     source_org_oid=claim_row.source_org_oid,
                     claim_identifier=claim_row.CLAIM_ID,
                     service_number=claim_row.SVC_NBR,
@@ -361,11 +383,14 @@ def _to_claim_row(claim_row: Row) -> Row:
                     warning=validation_warnings,
                     is_valid=valid,
                     has_warnings=warn)
-    return diag_row
+    return claim_stage_row
 
 
-def to_claim_row(claim_raw: RDD) -> RDD:
-    return claim_raw.map(lambda r: _to_claim_row(r))
+def to_claim(claim_raw: RDD) -> RDD:
+    return claim_raw.map(lambda r: _to_claim_row(r))\
+                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier)) \
+                    .reduceByKey((lambda a, b: a))\
+                    .map(lambda r: r[1])
 
 
 def _to_practitioner_row(claim_row: Row) -> Row:

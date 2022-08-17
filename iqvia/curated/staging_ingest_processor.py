@@ -9,6 +9,8 @@ PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
 PROBLEM = 'PROBLEM'
 DRUG = 'DRUG'
+COST = 'COST'
+CLAIM = 'CLAIM'
 
 spark = SparkSession.builder \
     .appName("IQVIA Ingest") \
@@ -127,6 +129,23 @@ currated_df.unpersist(False)
 cost_rdd.unpersist(False)
 ####
 
+### claim
+claim_record_rdd = to_claim(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(claim_record_rdd, CLAIM)
+currated_df = claim_record_rdd.toDF(stage_claim_schema).persist(StorageLevel.MEMORY_AND_DISK)
+
+save_claim(currated_df, '')
+
+currated_df.unpersist(False)
+claim_record_rdd.unpersist(False)
+
+###
+
+
+### org
+
+
+###
 
 patient_plan_rdd = patient_raw.join(claim_raw, on=[patient_raw.PLAN_ID == plan_raw.PLAN_ID], how="inner") \
     .rdd \

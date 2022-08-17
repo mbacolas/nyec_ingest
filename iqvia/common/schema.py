@@ -241,3 +241,37 @@ stage_cost_schema = StructType([
     StructField("has_warnings", BooleanType()),
     StructField("batch_id", StringType())
 ])
+
+diag_row = Row(source_consumer_id=claim_row.PATIENT_ID,
+               source_org_oid=claim_row.source_org_oid,
+               claim_identifier=claim_row.CLAIM_ID,
+               service_number=claim_row.SVC_NBR,
+               type=source_claim_type.value,
+               sub_type=is_inpatient(claim_row.HOSP_ADMT_DT),
+               admission_date=admission_date_result.value,
+               discharge_date=discharge_date_result.value,
+               units_of_service=claim_row.SVC_CRGD_AMT,
+               facility_type_cd=facility_type_cd_result.value,
+               admission_source_cd=admission_source_cd_result.value,
+               admission_type_cd=admission_type_cd_result.value,
+               place_of_service_raw=claim_row.PLACE_OF_SVC_NM,
+               place_of_service=claim_row.PLACE_OF_SVC_NM,
+               error=validation_errors,
+               warning=validation_warnings,
+               is_valid=valid,
+               has_warnings=warn)
+
+stage_claim_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("source_org_oid", StringType()),
+    StructField("claim_identifier", StringType()),
+    StructField("service_number", StringType()),
+    StructField("paid_amount_raw", StringType()),
+    StructField("paid_amount", DecimalType()),
+    StructField("error", ArrayType(StringType())),
+    StructField("warning", ArrayType(StringType())),
+    StructField("is_valid", BooleanType()),
+    StructField("has_warnings", BooleanType()),
+    StructField("batch_id", StringType())
+])
