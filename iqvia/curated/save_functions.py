@@ -126,12 +126,15 @@ def save_cost(currated_cost_df: DataFrame, output_path: str):
                               col('service_number'))\
         .write.parquet(output_path, mode='overwrite')
 
-
 def save_claim(currated_claim_df: DataFrame, output_path: str):
     currated_claim_df.filter(currated_claim_df.is_valid == True) \
         .select(col('id'),
                 col('source_consumer_id'),
                 col('source_org_oid'),
+                col('payer_name'),
+                col('payer_id'),
+                col('plan_name'),
+                col('plan_id'),
                 col('claim_identifier'),
                 col('service_number'),
                 col('type'),

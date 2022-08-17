@@ -350,6 +350,8 @@ def _to_claim_row(claim_row: Row) -> Row:
     claim_stage_row = Row(id=row_id,
                            source_consumer_id=claim_row.PATIENT_ID,
                             source_org_oid=claim_row.source_org_oid,
+                            payer_name=claim_row.IMS_PAYER_NM,
+                            payer_id=claim_row.IMS_PLN_ID,
                             plan_name=claim_row.IMS_PLN_NM,
                             plan_id=claim_row.PLAN_ID,
                             claim_identifier=claim_row.CLAIM_ID,
@@ -365,10 +367,6 @@ def _to_claim_row(claim_row: Row) -> Row:
                             admission_source_cd=claim_row.ADMS_SRC_CD,
                             admission_type_cd=claim_row.ADMS_TYP_CD,
                             place_of_service=claim_row.PLACE_OF_SVC_NM,
-
-
-                            payer_name=claim_row.IMS_PAYER_NM,
-
                             error=validation_errors,
                             warning=validation_warnings,
                             is_valid=valid,
