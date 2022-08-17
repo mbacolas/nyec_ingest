@@ -1,4 +1,5 @@
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, MapType, BooleanType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
+    MapType, BooleanType, DecimalType
 
 raw_plan_schema = StructType([ \
     StructField("PLAN_ID", StringType()), \
@@ -133,6 +134,28 @@ stage_procedure_schema = StructType([
     StructField("batch_id", StringType())
 ])
 
+stage_problem_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("source_org_oid", StringType()),
+    StructField("start_date_raw", StringType()),
+    StructField("start_date", DateType()),
+    StructField("to_date_raw", StringType()),
+    StructField("to_date", DateType()),
+    StructField("code_raw", StringType()),
+    StructField("code", StringType()),
+    StructField("code_system_raw", StringType()),
+    StructField("code_system", StringType()),
+    StructField("desc", StringType()),
+    StructField("source_desc", StringType()),
+    StructField("is_admitting", BooleanType()),
+    StructField("error", ArrayType(StringType())),
+    StructField("warning", ArrayType(StringType())),
+    StructField("is_valid", BooleanType()),
+    StructField("has_warnings", BooleanType()),
+    StructField("batch_id", StringType())
+])
+
 error_schema = StructType([
     StructField("batch_id", StringType()),
     StructField("type", StringType()),
@@ -142,6 +165,7 @@ error_schema = StructType([
 ])
 
 stage_drug_schema = StructType([
+    StructField("id", StringType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("start_date_raw", StringType()),
@@ -175,6 +199,7 @@ raw_org_schema = StructType([
 ])
 
 stage_org_schema = StructType([
+    StructField("id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("name", StringType()),
     StructField("type", StringType()),
@@ -187,12 +212,29 @@ stage_org_schema = StructType([
 ])
 
 stage_patient_schema = StructType([
+    StructField("id", StringType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("type", StringType()),
     StructField("active", BooleanType()),
     StructField("dob", DateType()),
     StructField("gender", StringType()),
+    StructField("error", ArrayType(StringType())),
+    StructField("warning", ArrayType(StringType())),
+    StructField("is_valid", BooleanType()),
+    StructField("has_warnings", BooleanType()),
+    StructField("batch_id", StringType())
+])
+
+
+stage_cost_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("source_org_oid", StringType()),
+    StructField("claim_identifier", StringType()),
+    StructField("service_number", StringType()),
+    StructField("paid_amount_raw", StringType()),
+    StructField("paid_amount", DecimalType()),
     StructField("error", ArrayType(StringType())),
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),

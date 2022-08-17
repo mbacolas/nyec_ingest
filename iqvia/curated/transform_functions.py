@@ -103,7 +103,7 @@ def to_procedure(claim_rdd: RDD) -> RDD:
 
 def _to_problem_row(claim_row: Row) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
-    to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT')
+    to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', True)
     all_code_system_result = to_standard_code_system(claim_row.DIAG_VERS_TYP_ID, claim_row.DIAG_CD,
                                                      'DIAG_VERS_TYP_ID:DIAG_CD')
     diag_code_result = get_code(claim_row.DIAG_CD, all_code_system_result.value, 'DIAG_VERS_TYP_ID:DIAG_CD')
@@ -115,7 +115,9 @@ def _to_problem_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    diag_row = Row(source_consumer_id=claim_row.PATIENT_ID,
+    row_id = uuid.uuid4().hex[:12]
+    diag_row = Row(id=row_id,
+                   source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
                    start_date=start_date_result.value,
@@ -146,7 +148,7 @@ def to_problem(claim_rdd: RDD) -> RDD:
 
 def _to_admitting_diagnosis(claim_row: Row) -> Row:
     start_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT')
-    to_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT')
+    to_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', False)
     all_code_system_result = to_standard_code_system(claim_row.ADMS_DIAG_VERS_TYP_ID, None, 'ADMS_DIAG_VERS_TYP_ID')
     diag_code_result = get_code(claim_row.ADMS_DIAG_CD, all_code_system_result.value, 'ADMS_DIAG_CD')
     diag_code = extract_code(diag_code_result)
@@ -157,7 +159,9 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    diag_row = Row(source_consumer_id=claim_row.PATIENT_ID,
+    row_id = uuid.uuid4().hex[:12]
+    diag_row = Row(id=row_id,
+                   source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.HOSP_ADMT_DT,
                    start_date=start_date_result.value,
@@ -197,7 +201,9 @@ def _to_drug_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    drug_row = Row(source_consumer_id=claim_row.PATIENT_ID,
+    row_id = uuid.uuid4().hex[:12]
+    drug_row = Row(id=row_id,
+                   source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
                    start_date=start_date_result.value,
@@ -242,7 +248,7 @@ def is_inpatient(hosp_admt_dt: str):
 def _to_patient_row(patient_plan: Row) -> Row:
     # org_oid = is_valid(patient_plan.IMS_PAYER_ID, 'IMS_PAYER_ID')
     dob = str_to_date(f'{patient_plan.PAT_BRTH_YR_NBR}-01-01', 'patient.dob', '%Y-%m-%d')
-    gender = is_valid(patient_plan.PAT_GENDER_CD, 'PAT_GENDER_CD', ['M', 'F', 'U'])
+    gender = is_included(patient_plan.PAT_GENDER_CD, 'PAT_GENDER_CD', ['M', 'F', 'U'])
     validation_errors = extract_left(*[dob, gender])
     validation_warnings = []
     valid = is_record_valid(validation_errors)
@@ -285,19 +291,32 @@ def to_org(patient_plan_rdd: RDD) -> RDD:
 
 
 def _to_eligibility_row(patient_plan_rdd: Row) -> Row:
-    pass
+    pass #TODO: not data to implement
 
 
 def to_eligibility(patient_plan_rdd: RDD) -> RDD:
     return patient_plan_rdd.map(lambda r: _to_eligibility_row(r))
 
 
-def _to_cost_row(claim_row_rdd: Row) -> Row:
-    cost_row = Row(source_consumer_id=claim_row_rdd.PATIENT_ID,
-                    source_org_oid=claim_row_rdd.source_org_oid,
-                    claim_identifier=claim_row_rdd.CLAIM_ID,
-                    service_number=claim_row_rdd.SVC_NBR,
-                    paid_amount=claim_row_rdd.SVC_CRGD_AMT)
+def _to_cost_row(claim_row: Row) -> Row:
+    row_id = uuid.uuid4().hex[:12]
+    paid_amount_result = is_number(claim_row.SVC_CRGD_AMT)
+    validation_errors = extract_left(*[paid_amount_result])
+    valid = is_record_valid(validation_errors)
+    validation_warnings = []
+    warn = False
+    cost_row = Row(id=row_id,
+                   source_consumer_id=claim_row.PATIENT_ID,
+                    source_org_oid=claim_row.source_org_oid,
+                    claim_identifier=claim_row.CLAIM_ID,
+                    service_number=claim_row.SVC_NBR,
+                    paid_amount_raw=claim_row.SVC_CRGD_AMT,
+                    paid_amount=paid_amount_result.value,
+                    error=validation_errors,
+                    warning=validation_warnings,
+                    is_valid=valid,
+                    has_warnings=warn,
+                    batch_id=claim_row.batch_id)
     return cost_row
 
 

@@ -8,7 +8,7 @@ from iqvia.common.schema import error_schema
 
 
 def save_errors(rdd: RDD, row_type: str):
-    rdd.filter(lambda r: r.is_valid == False) \
+    rdd.filter(lambda r: r.is_included == False) \
         .map(lambda r: Row(batch_id=r.batch_id,
                            type=row_type,
                            row_errors=json.dumps(r.error),
@@ -53,12 +53,13 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('mod'),
                 col('batch_id')) \
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
+                              col('code'))\
         .write.parquet(output_path, mode='overwrite')
 
 
-def save_procedure_modifiers(currated_procedure_df: DataFrame, output_path: str):
-    currated_procedure_df.filter(currated_procedure_df.is_valid == True) \
+def save_procedure_modifiers(currated_procedure_mods_df: DataFrame, output_path: str):
+    currated_procedure_mods_df.filter(currated_procedure_mods_df.is_valid == True) \
         .select(col('source_org_oid'),
                 col('source_consumer_id'),
                 col('start_date'),
@@ -67,7 +68,8 @@ def save_procedure_modifiers(currated_procedure_df: DataFrame, output_path: str)
                 col('code_system'),
                 col('mod')) \
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
+                              col('code'))\
         .write.parquet(output_path, mode='overwrite')
 
 
@@ -84,5 +86,42 @@ def save_problem(currated_problem_df: DataFrame, output_path: str):
                 col('is_admitting'),
                 col('batch_id')) \
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
+                              col('code'))\
+        .write.parquet(output_path, mode='overwrite')
+
+
+def save_drug(currated_drug_df: DataFrame, output_path: str):
+    currated_drug_df.filter(currated_drug_df.is_valid == True) \
+        .select(col('id'),
+                col('source_consumer_id'),
+                col('source_org_oid'),
+                col('start_date'),
+                col('to_date'),
+                col('code'),
+                col('code_system'),
+                col('desc'),
+                col('source_desc'),
+                col("strength"),
+                col("form"),
+                col("classification"),
+                col('batch_id')) \
+        .repartition(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
+                              col('code'))\
+        .write.parquet(output_path, mode='overwrite')
+
+
+def save_cost(currated_cost_df: DataFrame, output_path: str):
+    currated_cost_df.filter(currated_cost_df.is_included == True) \
+        .select(col('id'),
+                col('source_consumer_id'),
+                col('source_org_oid'),
+                col('claim_identifier'),
+                col('service_number'),
+                col('paid_amount'),
+                col('batch_id')) \
+        .repartition(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
+                              col('service_number'))\
         .write.parquet(output_path, mode='overwrite')

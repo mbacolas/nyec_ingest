@@ -4,22 +4,28 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 from pymonad.either import Left, Right, Either
 import traceback
 import json
+from decimal import *
+
 
 
 all_codes = {}
 all_code_systems = {'ICD10'}
 NDC = 'NDC'
 
-def str_to_date(date_raw: str, source_column_name: str, date_format="%Y%m%d") -> Either:
+def str_to_date(date_raw: str, source_column_name: str, is_optional=False, date_format="%Y%m%d") -> Either:
     try:
-        if date_raw is None:
+        if is_optional and date_raw is None:
             return Right(None)
+        elif not is_optional and date_raw is None:
+            error = {'error': 'NULL value for required field', 'raw_value': date_raw, 'date_format': date_format,
+                     'source_column': source_column_name}
+            return Left(error)
         date_time_obj = datetime.strptime(date_raw, date_format).date()
+        return Right(date_time_obj)
     except Exception as e:
         e = traceback.format_exc()
         error = {'error': e, 'raw_value': date_raw, 'date_format': date_format, 'source_column': source_column_name}
         return Left(json.dumps(error))
-    return Right(date_time_obj)
 
 
 #TODO: REMOVE once ref data is loaded
@@ -64,12 +70,22 @@ def get_code_desc(code_raw: str, code_system_raw: str, source_column_name: str) 
         return Left(warn)
 
 
-def is_valid(obj: str, source_column_name: str, enum: list) -> Either:
+def is_included(obj: str, source_column_name: str, enum: list) -> Either:
     if obj in enum:
         return Right(obj)
     else:
         error = {'source_column_name': source_column_name,
                  'error': f'{source_column_name} IS NOT IN THE INCLUDED ENUM {enum}',
+                 'source_column_value': obj}
+        return Left(json.dumps(error))
+
+
+def is_number(obj: str, source_column_name: str) -> Either:
+    if obj is not None and obj.isnumeric():
+        return Right(Decimal(obj))
+    else:
+        error = {'source_column_name': source_column_name,
+                 'error': f'{source_column_name} value is either None/Null or not numeric',
                  'source_column_value': obj}
         return Left(json.dumps(error))
 

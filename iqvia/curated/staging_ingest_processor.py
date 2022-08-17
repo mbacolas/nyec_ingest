@@ -81,8 +81,8 @@ procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY
 save_errors(procedure_rdd, PROCEDURE)
 currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_procedure(currated_df)
-save_procedure_modifiers(currated_df)
+save_procedure(currated_df, '')
+save_procedure_modifiers(currated_df, '')
 
 currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
@@ -90,18 +90,43 @@ procedure_rdd.unpersist(False)
 ### problems
 problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(problem_rdd, PROBLEM)
-currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
+currated_df = problem_rdd.toDF(stage_problem_schema).persist(StorageLevel.MEMORY_AND_DISK)
+save_problem(currated_df, '')
 
-save_problem(currated_df)
+currated_df.unpersist(False)
+problem_rdd.unpersist(False)
+### admitting problems
+problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(problem_rdd, PROBLEM)
+currated_df = problem_rdd.toDF(stage_problem_schema).persist(StorageLevel.MEMORY_AND_DISK)
+save_problem(currated_df, '')
 
 currated_df.unpersist(False)
 problem_rdd.unpersist(False)
 ####
 
 ### drug
+drug_rdd = to_drug(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(drug_rdd, DRUG)
+currated_df = drug_rdd.toDF(stage_drug_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
+save_drug(currated_df, '')
 
+currated_df.unpersist(False)
+drug_rdd.unpersist(False)
 ####
+
+### cost
+cost_rdd = to_cost(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(cost_rdd, COST)
+currated_df = cost_rdd.toDF(stage_cost_schema).persist(StorageLevel.MEMORY_AND_DISK)
+
+save_cost(currated_df, '')
+
+currated_df.unpersist(False)
+cost_rdd.unpersist(False)
+####
+
 
 patient_plan_rdd = patient_raw.join(claim_raw, on=[patient_raw.PLAN_ID == plan_raw.PLAN_ID], how="inner") \
     .rdd \
