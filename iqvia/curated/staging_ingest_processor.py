@@ -74,6 +74,8 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
           on=[raw_claim_df.RENDERING_PROVIDER_ID == raw_rendering_provider_df.RENDERING_PROVIDER_ID_REF], how="left_outer") \
     .join(raw_referring_provider_df,
           on=[raw_claim_df.REFERRING_PROVIDER_ID == raw_referring_provider_df.REFERRING_PROVIDER_ID_REF], how="left_outer") \
+    .join(raw_plan_df,
+          on=[raw_plan_df.PLAN_ID == raw_claim_df.PLAN_ID_CLAIM], how="left_outer") \
     .withColumn('batch_id', lit(batch_id)) \
     .rdd\
     .persist(StorageLevel.MEMORY_AND_DISK)
@@ -146,6 +148,13 @@ claim_record_rdd.unpersist(False)
 
 
 ###
+
+
+### provider
+
+
+###
+
 
 patient_plan_rdd = patient_raw.join(claim_raw, on=[patient_raw.PLAN_ID == plan_raw.PLAN_ID], how="inner") \
     .rdd \

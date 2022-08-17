@@ -267,8 +267,16 @@ stage_claim_schema = StructType([
     StructField("source_org_oid", StringType()),
     StructField("claim_identifier", StringType()),
     StructField("service_number", StringType()),
-    StructField("paid_amount_raw", StringType()),
-    StructField("paid_amount", DecimalType()),
+    StructField("type", StringType()),
+    StructField("admission_date", DateType()),
+
+    StructField("discharge_date", DateType()),
+    StructField("admission_date", DateType()),
+    StructField("admission_date", DateType()),
+    StructField("admission_date", DateType()),
+    StructField("admission_date", StringType()),
+    StructField("admission_date", StringType()),
+
     StructField("error", ArrayType(StringType())),
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),

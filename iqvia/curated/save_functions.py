@@ -134,7 +134,30 @@ def save_claim(currated_claim_df: DataFrame, output_path: str):
                 col('source_org_oid'),
                 col('claim_identifier'),
                 col('service_number'),
-                col('paid_amount'),
+                col('type'),
+                col('sub_type'),
+                col('start_date'),
+                col('end_date'),
+                col('admission_date'),
+                col('discharge_date'),
+                col('units_of_service'),
+                col('facility_type_cd'),
+                col('admission_source_cd'),
+                col('admission_type_cd'),
+                col('place_of_service'),
+                col('batch_id')) \
+        .repartition(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
+                              col('service_number'))\
+        .write.parquet(output_path, mode='overwrite')
+
+
+def save_provider(currated_provider_df: DataFrame, output_path: str):
+    currated_provider_df.filter(currated_provider_df.is_valid == True) \
+        .select(col('id'),
+                col('source_consumer_id'),
+                col('source_org_oid'),
+
                 col('batch_id')) \
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),

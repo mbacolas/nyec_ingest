@@ -334,20 +334,6 @@ def _to_claim_row(claim_row: Row) -> Row:
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
     admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', False)
     discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', False) #should be True
-
-    # claim_start_date_value = None
-    # claim_end_date_value = None
-    # if admission_date_result.value is None:
-    #     claim_start_date_value = start_date_result.value
-    # else:
-    #     claim_start_date_value = admission_date_result.value
-    #
-    # # most HOSP_DISCHG_DTs are missing for some reason
-    # if admission_date_result.value is None:
-    #     claim_end_date_value = to_date_result.value
-    # else:
-    #     claim_end_date_value = discharge_date_result.value
-
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
@@ -360,23 +346,29 @@ def _to_claim_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
+
     claim_stage_row = Row(id=row_id,
                            source_consumer_id=claim_row.PATIENT_ID,
                             source_org_oid=claim_row.source_org_oid,
+                            plan_name=claim_row.IMS_PLN_NM,
+                            plan_id=claim_row.PLAN_ID,
                             claim_identifier=claim_row.CLAIM_ID,
                             service_number=claim_row.SVC_NBR,
                             type=source_claim_type.value,
                             sub_type=is_inpatient(claim_row.HOSP_ADMT_DT),
-                            claim_start_date=start_date_result.value,
-                            claim_end_date=to_date_result.value,
+                            start_date=start_date_result.value,
+                            end_date=to_date_result.value,
                             admission_date=admission_date_result.value,
                             discharge_date=discharge_date_result.value,
-                            units_of_service=claim_row.SVC_CRGD_AMT,
-                            facility_type_cd=facility_type_cd_result.value,
-                            admission_source_cd=admission_source_cd_result.value,
-                            admission_type_cd=admission_type_cd_result.value,
-                            place_of_service_raw=claim_row.PLACE_OF_SVC_NM,
+                            units_of_service=claim_row.UNIT_OF_SVC_AMT,
+                            facility_type_cd=claim_row.FCLT_TYP_CD,
+                            admission_source_cd=claim_row.ADMS_SRC_CD,
+                            admission_type_cd=claim_row.ADMS_TYP_CD,
                             place_of_service=claim_row.PLACE_OF_SVC_NM,
+
+
+                            payer_name=claim_row.IMS_PAYER_NM,
+
                             error=validation_errors,
                             warning=validation_warnings,
                             is_valid=valid,
