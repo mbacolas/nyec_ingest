@@ -12,11 +12,11 @@ all_codes = {}
 all_code_systems = {'ICD10'}
 NDC = 'NDC'
 
-def str_to_date(date_raw: str, source_column_name: str, is_optional=False, date_format="%Y%m%d") -> Either:
+def str_to_date(date_raw: str, source_column_name: str, is_requied=True, date_format="%Y%m%d") -> Either:
     try:
-        if is_optional and date_raw is None:
+        if not is_requied and date_raw is None:
             return Right(None)
-        elif not is_optional and date_raw is None:
+        elif is_requied and date_raw is None:
             error = {'error': 'NULL value for required field', 'raw_value': date_raw, 'date_format': date_format,
                      'source_column': source_column_name}
             return Left(error)
