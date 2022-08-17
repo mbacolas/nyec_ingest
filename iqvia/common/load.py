@@ -75,7 +75,7 @@ def load_provider(spark: SparkSession, load_path: str, schema: StructType):
 
 def load_rendering_provider(provider_raw: DataFrame):
     return provider_raw \
-        .select(col('PROVIDER_ID').alias('RENDERING_PROVIDER_ID_REF'),
+        .select(col('PROVIDER_ID').alias('RENDERING_PROVIDER_ID'),
                 col('PROVIDER_TYP_ID').alias('RENDERING_PROVIDER_TYP_ID'),
                 col('ORG_NM').alias('RENDERING_ORG_NM'),
                 col('IMS_RXER_ID').alias('RENDERING_IMS_RXER_ID'),
@@ -94,7 +94,7 @@ def load_rendering_provider(provider_raw: DataFrame):
 
 def load_referring_provider(provider_raw: DataFrame):
     return provider_raw \
-        .select(col('PROVIDER_ID').alias('REFERRING_PROVIDER_ID_REF'),
+        .select(col('PROVIDER_ID').alias('REFERRING_PROVIDER_ID'),
                 col('PROVIDER_TYP_ID').alias('REFERRING_PROVIDER_TYP_ID'),
                 col('ORG_NM').alias('REFERRING_ORG_NM'),
                 col('IMS_RXER_ID').alias('REFERRING_IMS_RXER_ID'),

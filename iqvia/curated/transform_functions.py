@@ -326,55 +326,34 @@ def to_cost(claim_row_rdd: RDD) -> RDD:
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
 
-# claim_identifier
-# service_number
-# payer_name
-# type (institutional, professional) pharmacy, vision, dental?
-# sub_type (Inpatient vs Outpatient and/or a specialty service)
-# start_date
-# end_date
-# accident
-# accident_date
-# accident_type
-# date_submitted
-# date_processed
-# present_on_admision
-# admission_date
-# discharge_date
-# units_of_service
-# preauth_id
-# facility_type_cd
-# admission_source_cd
-# admission_type_cd
-# place_of_service
+
 def _to_claim_row(claim_row: Row) -> Row:
     source_claim_type = to_claim_type(claim_row.CLAIM_TYP_CD)
 
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
-    admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT')
-    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT')
+    admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', False)
+    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', False) #should be True
 
-    claim_start_date_value = None
-    claim_end_date_value = None
-    if admission_date_result.value is None:
-        claim_start_date_value = start_date_result.value
-    else:
-        claim_start_date_value = admission_date_result.value
-
-    # most HOSP_DISCHG_DTs are missing for some reason
-    if admission_date_result.value is None:
-        claim_end_date_value = to_date_result.value
-    else:
-        claim_end_date_value = discharge_date_result.value
+    # claim_start_date_value = None
+    # claim_end_date_value = None
+    # if admission_date_result.value is None:
+    #     claim_start_date_value = start_date_result.value
+    # else:
+    #     claim_start_date_value = admission_date_result.value
+    #
+    # # most HOSP_DISCHG_DTs are missing for some reason
+    # if admission_date_result.value is None:
+    #     claim_end_date_value = to_date_result.value
+    # else:
+    #     claim_end_date_value = discharge_date_result.value
 
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
     row_id = uuid.uuid4().hex[:12]
     validation_errors = extract_left(*[source_claim_type,
-                                       admission_date_result,
-                                       discharge_date_result,
+                                       start_date_result,
                                        facility_type_cd_result,
                                        admission_source_cd_result,
                                        admission_type_cd_result])
@@ -388,10 +367,10 @@ def _to_claim_row(claim_row: Row) -> Row:
                             service_number=claim_row.SVC_NBR,
                             type=source_claim_type.value,
                             sub_type=is_inpatient(claim_row.HOSP_ADMT_DT),
-                            claim_start_date=claim_start_date_value,
-                            claim_end_date=claim_end_date_value,
-                            # admission_date=admission_date_result.value,
-                            # discharge_date=discharge_date_result.value,
+                            claim_start_date=start_date_result.value,
+                            claim_end_date=to_date_result.value,
+                            admission_date=admission_date_result.value,
+                            discharge_date=discharge_date_result.value,
                             units_of_service=claim_row.SVC_CRGD_AMT,
                             facility_type_cd=facility_type_cd_result.value,
                             admission_source_cd=admission_source_cd_result.value,
@@ -413,38 +392,59 @@ def to_claim(claim_raw: RDD) -> RDD:
 
 
 def _to_practitioner_row(claim_row: Row) -> Row:
-    rendering_provider_row = Row(npi=claim_row.RENDERING_NPI,
+    # source_provider_id_result = is_null(claim_row.RENDERING_PROVIDER_ID_REF, 'RENDERING_PROVIDER_ID_REF')
+
+    providers = []
+
+    if claim_row.RENDERING_PROVIDER_ID is not None:
+        source_provider_type_result = validate_provider_type(claim_row.RENDERING_PROVIDER_TYP_ID)
+        validation_errors = extract_left(*[source_provider_type_result])
+        valid = is_record_valid(validation_errors)
+        validation_warnings = []
+        warn = False
+
+        rendering_provider_row = Row(npi=claim_row.RENDERING_NPI,
+                                    source_org_oid=claim_row.source_org_oid,
+                                    first_name=claim_row.RENDERING_FIRST_NM,
+                                    last_name=claim_row.RENDERING_LAST_NM,
+                                    source_provider_id=claim_row.RENDERING_PROVIDER_ID,
+                                    provider_type=source_provider_type_result.value,
+                                    role=RENDERING,
+                                    claim_identifier=claim_row.CLAIM_ID,
+                                    active=True,
+                                    error=validation_errors,
+                                    warning=validation_warnings,
+                                    is_valid=valid,
+                                    has_warnings=warn)
+        providers.append(rendering_provider_row)
+
+    if claim_row.REFERRING_PROVIDER_ID is not None:
+        source_provider_type_result = validate_provider_type(claim_row.REFERRING_PROVIDER_TYP_ID)
+        validation_errors = extract_left(*[source_provider_type_result])
+        valid = is_record_valid(validation_errors)
+        validation_warnings = []
+        warn = False
+        ref_provider_row = Row(npi=claim_row.REFERRING_NPI,
                                 source_org_oid=claim_row.source_org_oid,
-                                first_name=claim_row.RENDERING_FIRST_NM,
-                                last_name=claim_row.RENDERING_LAST_NM,
-                                source_provider_id=claim_row.RENDERING_PROVIDER_ID_REF,
-                                provider_type=claim_row.RENDERING_PROVIDER_TYP_ID,
-                                role=RENDERING,
+                                first_name=claim_row.REFERRING_FIRST_NM,
+                                last_name=claim_row.REFERRING_LAST_NM,
+                                source_provider_id=claim_row.REFERRING_PROVIDER_ID,
+                                provider_type=source_provider_type_result.value,
+                                role=REFERRING,
                                 claim_identifier=claim_row.CLAIM_ID,
                                 active=True,
-                                error=[],
-                                warning=[],
-                                is_valid=True,
-                                has_warnings=False)
-    ref_provider_row = Row(npi=claim_row.REFERRING_NPI,
-                            source_org_oid=claim_row.source_org_oid,
-                            first_name=claim_row.REFERRING_FIRST_NM,
-                            last_name=claim_row.REFERRING_LAST_NM,
-                            source_provider_id=claim_row.REFERRING_PROVIDER_ID_REF,
-                            provider_type=claim_row.REFERRING_PROVIDER_TYP_ID,
-                            role=REFERRING,
-                            claim_identifier=claim_row.CLAIM_ID,
-                            active=True,
-                            error=[],
-                            warning=[],
-                            is_valid=True,
-                            has_warnings=False)
-    return [rendering_provider_row, ref_provider_row]
+                                error=validation_errors,
+                                warning=validation_warnings,
+                                is_valid=valid,
+                                has_warnings=warn)
+        providers.append(ref_provider_row)
+
+    return providers
 
 
 def to_practitioner_row(claim_rdd: RDD) -> RDD:
-    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r))\
-                    .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
+    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r))
+                    # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
 
 
 def to_practitioner_role_row(practitioner_rdd: RDD) -> RDD:

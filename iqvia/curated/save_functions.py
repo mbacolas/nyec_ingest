@@ -113,7 +113,22 @@ def save_drug(currated_drug_df: DataFrame, output_path: str):
 
 
 def save_cost(currated_cost_df: DataFrame, output_path: str):
-    currated_cost_df.filter(currated_cost_df.is_included == True) \
+    currated_cost_df.filter(currated_cost_df.is_valid == True) \
+        .select(col('id'),
+                col('source_consumer_id'),
+                col('source_org_oid'),
+                col('claim_identifier'),
+                col('service_number'),
+                col('paid_amount'),
+                col('batch_id')) \
+        .repartition(col('source_org_oid'), col('source_consumer_id'))\
+        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
+                              col('service_number'))\
+        .write.parquet(output_path, mode='overwrite')
+
+
+def save_claim(currated_claim_df: DataFrame, output_path: str):
+    currated_claim_df.filter(currated_claim_df.is_valid == True) \
         .select(col('id'),
                 col('source_consumer_id'),
                 col('source_org_oid'),
