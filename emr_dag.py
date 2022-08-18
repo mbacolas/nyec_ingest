@@ -22,7 +22,8 @@ subnetID = ssm_client.get_parameter(Name='/nyec/dev/subnetID')
 
 JOB_FLOW_OVERRIDES = {
     "Name": "nyec-cluster-" + execution_date,
-    "ReleaseLabel": "emr-5.36.0",
+    "ReleaseLabel": "emr-6.7.0",
+    # "ReleaseLabel": "emr-5.36.0",
     "LogUri": "s3://{}/logs/emr/".format(S3_BUCKET_NAME),
     "Instances": {
         "InstanceGroups": [
@@ -81,20 +82,24 @@ SPARK_TEST_STEPS = [
             'Jar': 'command-runner.jar',
             'Args': ['spark-submit',
                      '--conf',
-                     'spark.nyec.iqvia.patient_ingest_path=s3://nyce-iqvia/raw/2022/08/18/patient/20220809/',
+                     'spark.nyec.iqvia.patient_ingest_path=s3://nyce-iqvia/raw/2022/08/17/patient/20220809/',
                      '--conf',
-                     'spark.nyec.iqvia.claims_ingest_path=s3://nyce-iqvia/raw/2022/08/18/factdx/20220809/',
+                     'spark.nyec.iqvia.claims_ingest_path=s3://nyce-iqvia/raw/2022/08/17/factdx/20220809/',
                      '/home/hadoop/test_processor.py'
                      ]
         }
     }
 ]
 
-#
 # def get_parameters(self, **kwargs):
 #     dag_run = kwargs.get('dag_run')
 #     parameters = dag_run.conf['key']
 #     return parameters
+
+
+from airflow.models import Variable
+foo = Variable.get("spark.nyec.iqvia.patient_ingest_path")
+print(f'******************** foo: {foo}')
 
 default_args = {
     'owner': 'airflow',

@@ -29,9 +29,9 @@ spark = SparkSession\
             .getOrCreate()
 
 conf = spark.conf
-sqlContext = SQLContext(spark)
+# sqlContext = SQLContext(spark)
 
-patient_path = conf.get("spark.nyec.iqvia.patients_ingest_path")
+patient_path = conf.get("spark.nyec.iqvia.patient_ingest_path")
 claim_path = conf.get("spark.nyec.iqvia.claims_ingest_path")
 output_path = 's3://nyce-iqvia/processed-parquet/patient_test/'
 
