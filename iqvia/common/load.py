@@ -1,9 +1,10 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
+from pyspark.sql.functions import StructType
 
 
-def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimiter=',', file_header=True,
+def load_df(spark: SparkSession, load_path: str, schema, file_delimiter=',', file_header=True,
             infer_schema=False):
     if not infer_schema:
         return spark.read \
@@ -22,15 +23,14 @@ def load_plan(spark: SparkSession, load_path: str, schema: StructType):
         .withColumn('plan_status', lit(True))
 
 
-def load_patient(spark: SparkSession, load_path: str, schema: StructType, batch_id: str):
+def load_patient(spark: SparkSession, load_path: str, schema):
     return load_df(spark, load_path, schema) \
         .withColumn('consumer_type', lit('MEMBER')) \
         .withColumn('consumer_status', lit(True)) \
-        .withColumn('source_org_oid', lit('IQVIA')) \
-        .withColumn('batch_id', lit(batch_id))
+        .withColumn('source_org_oid', lit('IQVIA'))
 
 
-def load_claim(spark: SparkSession, load_path: str, schema: StructType):
+def load_claim(spark: SparkSession, load_path: str, schema):
     return load_df(spark, load_path, schema) \
         .withColumn("PLAN_ID_CLAIM", col("PLAN_ID_CLAIM")) \
         .withColumn("PATIENT_ID_CLAIM", col("PATIENT_ID")) \

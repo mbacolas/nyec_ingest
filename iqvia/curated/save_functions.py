@@ -15,7 +15,8 @@ def save_errors(rdd: RDD, row_type: str):
                            row_value=json.dumps(r.asDict()),
                            date_created=datetime.now())) \
         .toDF(error_schema) \
-        .write.format("jdbc") \
+        .write\
+        .format("jdbc") \
         .option("url", "jdbc:postgresql://localhost:5432/postgres") \
         .option("driver", "org.postgresql.Driver") \
         .option("dbtable", "public.error") \

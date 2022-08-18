@@ -2,8 +2,9 @@ from transform_functions import *
 from save_functions import *
 from iqvia.common.load import *
 from iqvia.common.schema import *
-
+from pyspark.sql import SQLContext
 from pyspark import StorageLevel
+from iqvia.claim_service import claims_header
 
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
@@ -13,11 +14,18 @@ COST = 'COST'
 CLAIM = 'CLAIM'
 PRACTIONER = 'PRACTIONER'
 
-spark = SparkSession.builder \
-    .appName("IQVIA Ingest") \
-    .getOrCreate()
+
+spark = SparkSession\
+            .builder\
+            .appName("test")\
+            .config("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")\
+            .config("fs.s3a.sse.enabled",True)\
+            .config("fs.s3a.server-side-encryption-algorithm", "SSE-KMS")\
+            .appName("IQVIA Ingest") \
+            .getOrCreate()
 
 conf = spark.conf
+sqlContext = SQLContext(spark)
 
 plan_path = conf.get("spark.nyec.iqvia.plans_ingest_path")
 patient_path = conf.get("spark.nyec.iqvia.patients_ingest_path")
@@ -30,13 +38,18 @@ provider_path = conf.get("spark.nyec.iqvia.providers_ingest_path")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
 # pro_provider_path = conf.get("spark.nyec.iqvia.pro_provider_ingest_path")
 
+rdd_test = spark.sparkContext.textFile(claim_path)
+header_fields = rdd_test.first().split(',')
+expected_header = claims_header()
+assert expected_header == header_fields
+
 
 ### create data frames
 org_data = [("IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, batch_id)
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
@@ -100,6 +113,7 @@ save_problem(currated_df, '')
 
 currated_df.unpersist(False)
 problem_rdd.unpersist(False)
+
 ### admitting problems
 problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(problem_rdd, PROBLEM)
