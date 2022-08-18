@@ -154,13 +154,14 @@ practitioner_rdd = to_practitioner(patient_claims_raw_rdd).persist(StorageLevel.
 save_errors(practitioner_rdd, PRACTIONER)
 currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-practitioner_role_rdd = currated_df.select(col('source_provider_id'), col('claim_identifier'), col('role'))
+practitioner_role_df = to_practitioner_role_row(currated_df)
 
 save_provider_role(currated_df, '')
-save_provider(currated_df, '')
+save_provider(practitioner_role_df, '')
 
 currated_df.unpersist(False)
 practitioner_rdd.unpersist(False)
+practitioner_role_df.unpersist(False)
 ###
 
 
