@@ -13,7 +13,18 @@ import pandas as pd
 # ./pyspark --conf spark.driver.cores=5 --conf spark.executor.cores=5 --conf spark.driver.memory=8g --conf spark.executor.memory=8g --conf "spark.nyec.iqvia.claims_ingest_path=/tmp/claim.csv"  --conf "spark.nyec.iqvia.patient_ingest_path=/tmp/patient.csv"  --driver-class-path /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar --jars /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar
 # --conf "spark.nyec.dynamic_config = '[{"ingest_path" : "/tmp/claim.csv", "from" : "raw_claim_schema", "import" : "iqvia.common.schema"}, {"ingest_path" : "/tmp/patient.csv", "from" : "raw_patient_schema", "import" : "iqvia.common.schema"}]'
 
-bin/spark-submit  --conf spark.driver.cores=5 --conf spark.executor.cores=5  --conf spark.driver.memory=8g --conf spark.nyec.iqvia.claims_ingest_path=/tmp/claim.csv --driver-class-path /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar --jars /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar
+# bin/spark-submit  --conf spark.driver.cores=5 --conf spark.executor.cores=5  --conf spark.driver.memory=8g --conf spark.nyec.iqvia.claims_ingest_path=/tmp/claim.csv --driver-class-path /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar --jars /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar
+
+[{"ingest_path" : "s3://nyec-dev-raw-data-bucket/iqvia/plan/20220809/", "from" : "raw_plan_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "s3://nyec-dev-raw-data-bucket/iqvia/patient/20220809/", "from" : "raw_patient_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "s3://nyec-dev-raw-data-bucket/iqvia/factdx/20220809/", "from" : "raw_claim_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "/tmp/patient.csv", "from" : "raw_procedure_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "/tmp/patient.csv", "from" : "raw_procedure_modifier_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "/tmp/patient.csv", "from" : "raw_diag_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "/tmp/patient.csv", "from" : "raw_drug_schema", "import" : "iqvia.common.schema"},
+ {"ingest_path" : "/tmp/patient.csv", "from" : "raw_provider_schema", "import" : "iqvia.common.schema"}
+ ]
+
 if __name__ == '__main__':
 
     p_header = patient_header()

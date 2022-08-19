@@ -31,9 +31,11 @@ spark = SparkSession\
 conf = spark.conf
 # sqlContext = SQLContext(spark)
 
-patient_path = conf.get("spark.nyec.iqvia.patient_ingest_path")
-claim_path = conf.get("spark.nyec.iqvia.claims_ingest_path")
-output_path = 's3://nyce-iqvia/processed-parquet/patient_test/'
+# patient_path = conf.get("spark.nyec.iqvia.patient_ingest_path")
+# claim_path = conf.get("spark.nyec.iqvia.claims_ingest_path")
+
+plan_ingest_path = conf.get("spark.nyec.iqvia.spark.nyec.iqvia.plan_ingest_path")
+output_path = 's3://nyce-iqvia/processed-parquet/plan_test/'
 
 rdd_test = spark.sparkContext.textFile('s3://nyce-iqvia/adhoc/raw/OrganizationData.csv')
 header_fields = rdd_test.first().split(',')
@@ -45,9 +47,9 @@ else:
     print('********************* FAILED *********************')
 
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
+raw_patient_df = load_patient(spark, plan_ingest_path, raw_plan_schema)
+# raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
 
-patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner")\
-                                .withColumn('batch_id', lit(batch_id)) \
-                                .write.parquet(output_path, mode='overwrite')
+# patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner")\
+#                                 .withColumn('batch_id', lit(batch_id)) \
+raw_patient_df.write.parquet(output_path, mode='overwrite')
