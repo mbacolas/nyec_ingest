@@ -27,7 +27,7 @@ iqvia_processed_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_processed_s3_prefix
 
 
 def generate_output_path(data_set_name: str) -> str:
-    return f'iqvia_processed_s3_prefix/{data_set_name}/'
+    return f'{iqvia_processed_s3_prefix}/{data_set_name}/'
 
 
 load_df(spark, plan_load_path, raw_plan_schema, file_delimiter=file_parsing_delimiter)\

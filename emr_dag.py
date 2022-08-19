@@ -23,18 +23,7 @@ ssm_client = boto3.client("ssm", region_name=AWS_REGION)
 subnetID = ssm_client.get_parameter(Name='/nyec/dev/subnetID')
 from airflow.models import Variable
 
-iqvia_data_types = Variable.get("iqvia_data_types", deserialize_json=True)
-# iqvia_processed_to_curated_paths = Variable.get("iqvia_processed_to_curated_paths", deserialize_json=True)
-
-processed_plan_ingest_path = '' # Variable.get("spark.nyec.iqvia.processed_plan_ingest_path")
-# processed_patient_ingest_path = iqvia_processed_to_curated_paths['spark.nyec.iqvia.processed_patient_ingest_path']
-# processed_claims_ingest_path = iqvia_processed_to_curated_paths['spark.nyec.iqvia.processed_claims_ingest_path']
-
-processed_procedure_ingest_path = '' #Variable.get("spark.nyec.iqvia.processed_procedure_ingest_path")
-processed_procedure_modifier_ingest_path = '' #Variable.get("spark.nyec.iqvia.processed_procedure_modifier_ingest_path")
-processed_diagnosis_ingest_path = '' #Variable.get("spark.nyec.iqvia.processed_diagnosis_ingest_path")
-processed_drug_ingest_path = '' #Variable.get("spark.nyec.iqvia.processed_drug_ingest_path")
-processed_provider_ingest_path = '' #Variable.get("spark.nyec.iqvia.processed_provider_ingest_path")
+# iqvia_data_types = Variable.get("iqvia_data_types", deserialize_json=True)
 
 
 JOB_FLOW_OVERRIDES = {
@@ -92,6 +81,7 @@ def generate_date_path(data_set_name):
     return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
+iqvia_curated_s3_prefix = Variable.get('iqvia_curated_s3_prefix')
 
 
 SPARK_STEPS = [
@@ -110,76 +100,38 @@ SPARK_STEPS = [
             'Jar': 'command-runner.jar',
             'Args': ['spark-submit',
                      '--conf',
-                     f'spark.nyec.iqvia.plan_ingest_path={generate_date_path("plan")}',
+                     f'spark.nyec.iqvia.raw_plan_ingest_path={generate_date_path("plan")}',
                      '--conf',
-                     f'spark.nyec.iqvia.processed_patient_ingest_path={generate_date_path("patient")}',
+                     f'spark.nyec.iqvia.raw_patient_ingest_path={generate_date_path("patient")}',
                     '--conf',
-                     f'spark.nyec.iqvia.processed_claims_ingest_path={generate_date_path("factdx")}',
+                     f'spark.nyec.iqvia.raw_claims_ingest_path={generate_date_path("factdx")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_procedure_ingest_path={generate_date_path("procedure")}',
+                     f'spark.nyec.iqvia.raw_procedure_ingest_path={generate_date_path("procedure")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_procedure_modifier_ingest_path={generate_date_path("proceduremodifier")}',
+                     f'spark.nyec.iqvia.raw_procedure_modifier_ingest_path={generate_date_path("proceduremodifier")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_diagnosis_ingest_path={generate_date_path("diagnosis")}',
+                     f'spark.nyec.iqvia.raw_diagnosis_ingest_path={generate_date_path("diagnosis")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_drug_ingest_path={generate_date_path("product")}',
+                     f'spark.nyec.iqvia.raw_drug_ingest_path={generate_date_path("product")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_provider_ingest_path={generate_date_path("professionalprovidertier")}',
+                     f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("professionalprovidertier")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_provider_ingest_path={generate_date_path("provider")}',
+                     f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("provider")}',
 
-                     '/home/hadoop/staging_ingest_processor.py'
-                     ]
-        }
-    }
-]
-
-PROCESSED_TO_CURATED_SPARK_STEPS = [
-    {
-        'Name': 'setup - copy files',
-        'ActionOnFailure': 'CANCEL_AND_WAIT',
-        'HadoopJarStep': {
-            'Jar': 'command-runner.jar',
-            'Args': ['aws', 's3', 'cp', '--recursive', S3_URI, '/home/hadoop/']
-        }
-    },
-    {
-        'Name': 'Run Spark',
-        'ActionOnFailure': 'CANCEL_AND_WAIT',
-        'HadoopJarStep': {
-            'Jar': 'command-runner.jar',
-            'Args': ['spark-submit',
-                     '--conf',
-                     f'spark.nyec.iqvia.processed_plan_ingest_path={generate_date_path("plan")}',
-                     '--conf',
-                     f'spark.nyec.iqvia.processed_patient_ingest_path={generate_date_path("patient")}',
                     '--conf',
-                     f'spark.nyec.iqvia.processed_claims_ingest_path={generate_date_path("factdx")}',
+                     f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_procedure_ingest_path={generate_date_path("procedure")}',
+                     f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.processed_procedure_modifier_ingest_path={generate_date_path("proceduremodifier")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.processed_diagnosis_ingest_path={generate_date_path("diagnosis")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.processed_drug_ingest_path={generate_date_path("product")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.processed_provider_ingest_path={generate_date_path("professionalprovidertier")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.processed_provider_ingest_path={generate_date_path("provider")}',
-
+                     f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
                      '/home/hadoop/staging_ingest_processor.py'
                      ]
         }
@@ -208,7 +160,15 @@ emr_dag = DAG(
     # schedule_interval=timedelta(minutes=10)
 )
 
-create_cluster = EmrCreateJobFlowOperator(
+create_procssed_cluster = EmrCreateJobFlowOperator(
+    task_id='create_emr_cluster',
+    job_flow_overrides=JOB_FLOW_OVERRIDES,
+    aws_conn_id='aws_default',
+    emr_conn_id='emr_test',
+    dag=emr_dag
+)
+
+create_curated_cluster = EmrCreateJobFlowOperator(
     task_id='create_emr_cluster',
     job_flow_overrides=JOB_FLOW_OVERRIDES,
     aws_conn_id='aws_default',
@@ -220,7 +180,7 @@ trigger__emr_job = EmrAddStepsOperator(
     task_id='curate',
     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
-    steps=load_emr_steps,
+    steps=SPARK_STEPS,
     dag=emr_dag
 )
 
@@ -228,9 +188,13 @@ trigger_curate_emr_job = EmrAddStepsOperator(
     task_id='curate',
     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
-    steps=load_emr_steps,
+    steps=SPARK_STEPS,
     dag=emr_dag
 )
+
+
+
+
 
 # cluster_remover = EmrTerminateJobFlowOperator(
 #     task_id='remove_cluster',
@@ -256,7 +220,7 @@ trigger_curate_emr_job = EmrAddStepsOperator(
 def push():
     # iqvia_data_types = Variable.get("iqvia_data_types", deserialize_json=True)
     # print(f'------------------------------------------ >>> {type(iqvia_data_types)}')
-    print(f'------------------------------------------ >>> {PROCESSED_TO_CURATED_SPARK_STEPS}')
+    print(f'------------------------------------------ >>> {SPARK_STEPS}')
 
 
 push1 = PythonOperator(
@@ -266,7 +230,8 @@ push1 = PythonOperator(
     python_callable=push,
 )
 
-push1
+push1 >> [create_procssed_cluster, create_curated_cluster] >> [trigger__emr_job, trigger__emr_job]
+
 #
 
 # create_cluster >> trigger_curate_emr_job

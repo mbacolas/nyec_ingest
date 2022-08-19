@@ -35,8 +35,13 @@ proc_modifier_path = conf.get("spark.nyec.iqvia.proc_mod_ingest_path")
 diagnosis_path = conf.get("spark.nyec.iqvia.diags_ingest_path")
 drug_path = conf.get("spark.nyec.iqvia.drugs_ingest_path")
 provider_path = conf.get("spark.nyec.iqvia.providers_ingest_path")
+iqvia_curated_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_curated_s3_prefix")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
 # pro_provider_path = conf.get("spark.nyec.iqvia.pro_provider_ingest_path")
+
+def generate_output_path(data_set_name: str) -> str:
+    return f'{iqvia_curated_s3_prefix}/{data_set_name}/'
+
 
 rdd_test = spark.sparkContext.textFile(claim_path)
 header_fields = rdd_test.first().split(',')
@@ -49,7 +54,7 @@ org_data = [("IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, batch_id)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
@@ -94,13 +99,14 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
     .rdd\
     .persist(StorageLevel.MEMORY_AND_DISK)
 
+
 ### create procedure
 procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_rdd, PROCEDURE)
 currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_procedure(currated_df, '')
-save_procedure_modifiers(currated_df, '')
+save_procedure(currated_df, generate_output_path('procedure'))
+save_procedure_modifiers(currated_df, generate_output_path('proceduremodifier'))
 
 currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
@@ -108,20 +114,18 @@ procedure_rdd.unpersist(False)
 ### problems
 problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(problem_rdd, PROBLEM)
-currated_df = problem_rdd.toDF(stage_problem_schema).persist(StorageLevel.MEMORY_AND_DISK)
-save_problem(currated_df, '')
+admitting_problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(admitting_problem_rdd, PROBLEM)
+
+currated_df = problem_rdd.union(admitting_problem_rdd)\
+                         .toDF(stage_problem_schema)\
+                         .persist(StorageLevel.MEMORY_AND_DISK)
+
+save_problem(currated_df, generate_output_path('diagnosis'))
 
 currated_df.unpersist(False)
 problem_rdd.unpersist(False)
-
-### admitting problems
-problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(problem_rdd, PROBLEM)
-currated_df = problem_rdd.toDF(stage_problem_schema).persist(StorageLevel.MEMORY_AND_DISK)
-save_problem(currated_df, '')
-
-currated_df.unpersist(False)
-problem_rdd.unpersist(False)
+admitting_problem_rdd.unpersist(False)
 ####
 
 ### drug
@@ -129,7 +133,7 @@ drug_rdd = to_drug(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(drug_rdd, DRUG)
 currated_df = drug_rdd.toDF(stage_drug_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_drug(currated_df, '')
+save_drug(currated_df, generate_output_path('product'))
 
 currated_df.unpersist(False)
 drug_rdd.unpersist(False)
@@ -140,7 +144,7 @@ cost_rdd = to_cost(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(cost_rdd, COST)
 currated_df = cost_rdd.toDF(stage_cost_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_cost(currated_df, '')
+save_cost(currated_df, generate_output_path('cost'))
 
 currated_df.unpersist(False)
 cost_rdd.unpersist(False)
@@ -151,14 +155,14 @@ claim_record_rdd = to_claim(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_
 save_errors(claim_record_rdd, CLAIM)
 currated_df = claim_record_rdd.toDF(stage_claim_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_claim(currated_df, '')
+save_claim(currated_df, generate_output_path('patient'))
 
 currated_df.unpersist(False)
 claim_record_rdd.unpersist(False)
 ###
 
 ### org
-save_org(org_df, '')
+save_org(org_df, generate_output_path('org'))
 org_df.unpersist()
 ###
 
@@ -170,8 +174,8 @@ currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.
 
 practitioner_role_df = to_practitioner_role_row(currated_df)
 
-save_provider_role(currated_df, '')
-save_provider(practitioner_role_df, '')
+save_provider_role(currated_df, generate_output_path('provider'))
+save_provider(practitioner_role_df, generate_output_path('provider_role'))
 
 currated_df.unpersist(False)
 practitioner_rdd.unpersist(False)
