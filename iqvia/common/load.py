@@ -25,13 +25,12 @@ def load_plan(spark: SparkSession, load_path: str, schema: StructType):
 def load_patient(spark: SparkSession, load_path: str, schema: StructType):
     return load_df(spark, load_path, schema) \
         .withColumn('consumer_type', lit('MEMBER')) \
-        .withColumn('consumer_status', lit(True)) \
-        .withColumn('source_org_oid', lit('IQVIA'))
+        .withColumn('consumer_status', lit(True))
 
 
 def load_claim(spark: SparkSession, load_path: str, schema: StructType):
     return load_df(spark, load_path, schema) \
-        .withColumn("PLAN_ID_CLAIM", col("PLAN_ID_CLAIM")) \
+        .withColumn("PLAN_ID_CLAIM", col("PLAN_ID")) \
         .withColumn("PATIENT_ID_CLAIM", col("PATIENT_ID")) \
         .withColumn('source_org_oid', lit('IQVIA')) \
         .drop(col("PATIENT_ID"))

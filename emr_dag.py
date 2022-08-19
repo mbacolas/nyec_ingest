@@ -19,6 +19,11 @@ S3_BUCKET_NAME = 'nyec-scripts'
 AWS_REGION = "us-east-1"
 ssm_client = boto3.client("ssm", region_name=AWS_REGION)
 subnetID = ssm_client.get_parameter(Name='/nyec/dev/subnetID')
+from airflow.models import Variable
+# patient_ingest_path = "{{ ti.xcom_pull(task_ids='submit_file_to_spark') }}"
+patient_ingest_path = Variable.get("spark.nyec.iqvia.patient_ingest_path")
+claims_ingest_path = Variable.get("spark.nyec.iqvia.claims_ingest_path")
+
 
 JOB_FLOW_OVERRIDES = {
     "Name": "nyec-cluster-" + execution_date,
@@ -82,24 +87,47 @@ SPARK_TEST_STEPS = [
             'Jar': 'command-runner.jar',
             'Args': ['spark-submit',
                      '--conf',
-                     'spark.nyec.iqvia.patient_ingest_path=s3://nyce-iqvia/raw/2022/08/17/patient/20220809/',
+                     f'spark.nyec.iqvia.patient_ingest_path={patient_ingest_path}',
                      '--conf',
-                     'spark.nyec.iqvia.claims_ingest_path=s3://nyce-iqvia/raw/2022/08/17/factdx/20220809/',
+                     f'spark.nyec.iqvia.claims_ingest_path={claims_ingest_path}',
                      '/home/hadoop/test_processor.py'
                      ]
         }
     }
 ]
 
+#
+# SPARK_TEST_STEPS = [
+#     {
+#         'Name': 'setup - copy files',
+#         'ActionOnFailure': 'CANCEL_AND_WAIT',
+#         'HadoopJarStep': {
+#             'Jar': 'command-runner.jar',
+#             'Args': ['aws', 's3', 'cp', '--recursive', S3_URI, '/home/hadoop/']
+#         }
+#     },
+#     {
+#         'Name': 'Run Spark',
+#         'ActionOnFailure': 'CANCEL_AND_WAIT',
+#         'HadoopJarStep': {
+#             'Jar': 'command-runner.jar',
+#             'Args': ['spark-submit',
+#                      '--conf',
+#                      f'spark.nyec.iqvia.patient_ingest_path=patient_ingest_path',
+#                      '--conf',
+#                      f'spark.nyec.iqvia.claims_ingest_path=claims_ingest_path',
+#                      '/home/hadoop/test_processor.py'
+#                      ]
+#         }
+#     }
+# ]
+#
+# SPARK_TEST_STEPS[1]
 # def get_parameters(self, **kwargs):
 #     dag_run = kwargs.get('dag_run')
 #     parameters = dag_run.conf['key']
 #     return parameters
 
-
-from airflow.models import Variable
-foo = Variable.get("spark.nyec.iqvia.patient_ingest_path")
-print(f'******************** foo: {foo}')
 
 default_args = {
     'owner': 'airflow',
