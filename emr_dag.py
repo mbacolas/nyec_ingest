@@ -119,7 +119,7 @@ TO_PROCESSED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.raw_drug_ingest_path={generate_date_path("product")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("professionalprovidertier")}',
+                     f'spark.nyec.iqvia.raw_pro_provider_ingest_path={generate_date_path("professionalprovidertier")}',
 
                      '--conf',
                      f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("provider")}',
@@ -127,10 +127,7 @@ TO_PROCESSED_SPARK_STEPS = [
                     '--conf',
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
 
-                     '--conf',
-                     f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
-
-                     '/home/hadoop/iqvia/processed/iqvia_raw_to_parquet_processor.py'
+                     '/home/hadoop/iqvia_raw_to_parquet_processor.py'
                      ]
         }
     }
@@ -171,7 +168,7 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.raw_drug_ingest_path={generate_date_path("product")}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("professionalprovidertier")}',
+                     f'spark.nyec.iqvia.pro_provider_ingest_path={generate_date_path("professionalprovidertier")}',
 
                      '--conf',
                      f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("provider")}',
@@ -179,9 +176,7 @@ TO_CURATED_SPARK_STEPS = [
                      '--conf',
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
-                     '--conf',
-                     f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
-                     '/home/hadoop/iqvia/curated/staging_ingest_processor.py'
+                     '/home/hadoop/staging_ingest_processor.py'
                      ]
         }
     }
