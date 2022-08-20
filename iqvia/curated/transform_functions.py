@@ -4,7 +4,7 @@ import uuid
 from common.functions import *
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
-
+from pymonad.either import *
 
 RENDERING = 'RENDERING'
 REFERRING = 'REFERRING'
@@ -255,7 +255,7 @@ def _to_patient_row(patient_plan: Row) -> Row:
     valid = is_record_valid(validation_errors)
     warn = False
     patient_row = Row(source_org_oid=patient_plan.source_org_oid,
-                      source_patient_id=patient_plan.PATIENT_ID,
+                      source_consumer_id=patient_plan.PATIENT_ID,
                       type=patient_plan.consumer_type,
                       active=patient_plan.consumer_status,
                       dob=dob.value,
@@ -269,9 +269,10 @@ def _to_patient_row(patient_plan: Row) -> Row:
 
 
 def to_patient(patient_plan_rdd: RDD) -> RDD:
-    return patient_plan_rdd.map(lambda r: _to_patient_row(r))
-                        # .keyBy(lambda r: (r.source_consumer_id)) \
-                        # .reduceByKey((lambda a, b: a))
+    return patient_plan_rdd.map(lambda r: _to_patient_row(r))\
+                        .keyBy(lambda r: (r.source_consumer_id)) \
+                        .reduceByKey((lambda a, b: a))\
+                        .map(lambda r: r[1])
 
 
 def _to_org_row(patient_plan: Row) -> Row:

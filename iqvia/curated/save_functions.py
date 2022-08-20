@@ -5,7 +5,7 @@ from pyspark.sql import DataFrame
 import uuid
 from common.functions import *
 from iqvia.common.schema import error_schema
-
+from pymonad.either import *
 
 def save_errors(rdd: RDD, row_type: str):
     rdd.filter(lambda r: r.is_included == False) \
@@ -16,23 +16,37 @@ def save_errors(rdd: RDD, row_type: str):
                            date_created=datetime.now())) \
         .toDF(error_schema) \
         .write\
-        .format("jdbc") \
-        .option("url", "jdbc:postgresql://localhost:5432/postgres") \
-        .option("driver", "org.postgresql.Driver") \
-        .option("dbtable", "public.error") \
-        .option("user", "postgres") \
-        .option("password", "mysecretpassword") \
-        .mode("append") \
-        .save()
+        .parquet('s3://nyce-iqvia/processed-parquet/error', mode='overwrite')
+
+    # rdd.filter(lambda r: r.is_included == False) \
+    #     .map(lambda r: Row(batch_id=r.batch_id,
+    #                        type=row_type,
+    #                        row_errors=json.dumps(r.error),
+    #                        row_value=json.dumps(r.asDict()),
+    #                        date_created=datetime.now())) \
+    #     .toDF(error_schema) \
+    #     .write\
+    #     .format("jdbc") \
+    #     .option("url", "jdbc:postgresql://localhost:5432/postgres") \
+    #     .option("driver", "org.postgresql.Driver") \
+    #     .option("dbtable", "public.error") \
+    #     .option("user", "postgres") \
+    #     .option("password", "mysecretpassword") \
+    #     .mode("append") \
+    #     .save()
 
 def save_org(org_df: DataFrame, output_path: str):
     org_df.select(col('source_org_oid'),
             col('name'),
             col('type'),
             col('active')) \
-        .write.parquet(output_path, mode='overwrite')
+        .write\
+        .parquet(output_path, mode='overwrite')
 
 def save_patient(currated_patient_df: DataFrame, output_path: str):
+    print(f'--------------------->>>> output_path {output_path}')
+    print(f'--------------------->>>> currated_patient_df {currated_patient_df.first()}')
+
     currated_patient_df.filter(currated_patient_df.is_valid == True) \
         .select(col('source_consumer_id'),
                 col('source_org_oid'),
@@ -43,7 +57,8 @@ def save_patient(currated_patient_df: DataFrame, output_path: str):
                 col('batch_id'))\
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'))\
-        .write.parquet(output_path, mode='overwrite')
+        .write\
+        .parquet(output_path, mode='overwrite')
 
 
 def save_procedure(currated_procedure_df: DataFrame, output_path: str):

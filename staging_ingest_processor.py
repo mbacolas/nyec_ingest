@@ -5,6 +5,8 @@ from iqvia.common.schema import *
 from pyspark.sql import SQLContext
 from pyspark import StorageLevel
 from iqvia.claim_service import claims_header
+from pymonad.either import *
+import uuid
 
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
@@ -44,7 +46,7 @@ def generate_output_path(data_set_name: str) -> str:
 
 
 rdd_test = spark.sparkContext.textFile(claim_path)
-header_fields = rdd_test.first().split(',')
+header_fields = rdd_test.first().split('|')
 expected_header = claims_header()
 assert expected_header == header_fields
 
@@ -70,12 +72,21 @@ raw_referring_provider_df = load_referring_provider(provider_raw)
 
 
 ### create stage patient DF
-patient_rdd = raw_patient_df.rdd.persist(StorageLevel.MEMORY_AND_DISK)
+patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id))\
+                            .withColumn('source_org_oid', lit('IQVIA'))\
+                            .rdd\
+                            .persist(StorageLevel.MEMORY_AND_DISK)
+
 currated_patient_df = to_patient(patient_rdd).toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
-save_patient(currated_patient_df, '')
+print(f'------------------>>>> currated_patient_df.first(): {currated_patient_df.first()}')
+
 save_errors(patient_rdd, PATIENT)
+save_patient(currated_patient_df, generate_output_path('patient'))
+
 patient_rdd.unpersist()
 currated_patient_df.unpersist()
+raw_patient_df.drop(col('batch_id'))
+raw_patient_df.drop(col('source_org_oid'))
 
 ### create clinical events
 patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
@@ -99,6 +110,7 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
     .rdd\
     .persist(StorageLevel.MEMORY_AND_DISK)
 
+# raw_claim_df.repartition(col('PATIENT_ID_CLAIM')).sortWithinPartitions(col('PATIENT_ID_CLAIM')).show(1)
 
 ### create procedure
 procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
@@ -155,7 +167,7 @@ claim_record_rdd = to_claim(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_
 save_errors(claim_record_rdd, CLAIM)
 currated_df = claim_record_rdd.toDF(stage_claim_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-save_claim(currated_df, generate_output_path('patient'))
+save_claim(currated_df, generate_output_path('claim'))
 
 currated_df.unpersist(False)
 claim_record_rdd.unpersist(False)

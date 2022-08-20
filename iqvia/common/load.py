@@ -3,7 +3,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import StructType
 # import findspark
 
-def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimiter=',', file_header=True,
+def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimiter='|', file_header=True,
             infer_schema=False):
     if not infer_schema:
         return spark.read \

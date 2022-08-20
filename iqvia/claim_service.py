@@ -7,7 +7,7 @@ import string
 
 def claims_header() -> list:
     columns = 'MONTH_ID, SVC_DT, PATIENT_ID, PAT_ZIP3, CLAIM_ID, SVC_NBR, DIAG_CD_POSN_NBR, CLAIM_TYP_CD, RENDERING_PROVIDER_ID, REFERRING_PROVIDER_ID, PLACE_OF_SVC_NM, PLAN_ID, PAY_TYP_DESC, DIAG_CD, DIAG_VERS_TYP_ID, PRC_CD, PRC_VERS_TYP_ID, PRC1_MODR_CD, PRC2_MODR_CD , PRC3_MODR_CD , PRC4_MODR_CD , NDC_CD , SVC_CRGD_AMT , UNIT_OF_SVC_AMT , HOSP_ADMT_DT , HOSP_DISCHG_DT , SVC_FR_DT , SVC_TO_DT , CLAIM_HOSP_REV_CD , FCLT_TYP_CD , ADMS_SRC_CD , ADMS_TYP_CD , ADMS_DIAG_CD , ADMS_DIAG_VERS_TYP_ID'.split(',')
-    stripped_columns = [s.strip().lower() for s in columns]
+    stripped_columns = [s.strip() for s in columns]
     return stripped_columns
 
 

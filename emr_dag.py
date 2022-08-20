@@ -206,13 +206,13 @@ emr_dag = DAG(
     # schedule_interval=timedelta(minutes=10)
 )
 
-create_processed_emr_cluster = EmrCreateJobFlowOperator(
-    task_id='create_processed_emr_cluster',
-    job_flow_overrides=JOB_FLOW_OVERRIDES,
-    aws_conn_id='aws_default',
-    emr_conn_id='emr_test',
-    dag=emr_dag
-)
+# create_processed_emr_cluster = EmrCreateJobFlowOperator(
+#     task_id='create_processed_emr_cluster',
+#     job_flow_overrides=JOB_FLOW_OVERRIDES,
+#     aws_conn_id='aws_default',
+#     emr_conn_id='emr_test',
+#     dag=emr_dag
+# )
 
 create_curated_emr_cluster = EmrCreateJobFlowOperator(
     task_id='create_curated_emr_cluster',
@@ -222,13 +222,13 @@ create_curated_emr_cluster = EmrCreateJobFlowOperator(
     dag=emr_dag
 )
 
-trigger_processed_emr_job = EmrAddStepsOperator(
-    task_id='trigger_processed_emr_job',
-    job_flow_id="{{ task_instance.xcom_pull('create_processed_emr_cluster', key='return_value') }}",
-    aws_conn_id='aws_default',
-    steps=TO_PROCESSED_SPARK_STEPS,
-    dag=emr_dag
-)
+# trigger_processed_emr_job = EmrAddStepsOperator(
+#     task_id='trigger_processed_emr_job',
+#     job_flow_id="{{ task_instance.xcom_pull('create_processed_emr_cluster', key='return_value') }}",
+#     aws_conn_id='aws_default',
+#     steps=TO_PROCESSED_SPARK_STEPS,
+#     dag=emr_dag
+# )
 
 trigger_curated_emr_job = EmrAddStepsOperator(
     task_id='trigger_curated_emr_job',
@@ -271,4 +271,5 @@ push1 = PythonOperator(
     python_callable=push,
 )
 
-push1 >> create_processed_emr_cluster >> create_curated_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]
+push1 >>  create_curated_emr_cluster >> trigger_curated_emr_job
+# create_processed_emr_cluster >> create_curated_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]
