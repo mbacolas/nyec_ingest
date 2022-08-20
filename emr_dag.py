@@ -104,7 +104,7 @@ TO_PROCESSED_SPARK_STEPS = [
                      '--conf',
                      f'spark.nyec.iqvia.raw_patient_ingest_path={generate_date_path("patient")}',
                     '--conf',
-                     f'spark.nyec.iqvia.raw_claims_ingest_path={generate_date_path("factdx")}',
+                     f'spark.nyec.iqvia.raw_claim_ingest_path={generate_date_path("factdx")}',
 
                      '--conf',
                      f'spark.nyec.iqvia.raw_procedure_ingest_path={generate_date_path("procedure")}',
@@ -150,10 +150,12 @@ TO_CURATED_SPARK_STEPS = [
             'Args': ['spark-submit',
                      '--conf',
                      f'spark.nyec.iqvia.raw_plan_ingest_path={generate_date_path("plan")}',
+
                      '--conf',
                      f'spark.nyec.iqvia.raw_patient_ingest_path={generate_date_path("patient")}',
+
                     '--conf',
-                     f'spark.nyec.iqvia.raw_claims_ingest_path={generate_date_path("factdx")}',
+                     f'spark.nyec.iqvia.raw_claim_ingest_path={generate_date_path("factdx")}',
 
                      '--conf',
                      f'spark.nyec.iqvia.raw_procedure_ingest_path={generate_date_path("procedure")}',

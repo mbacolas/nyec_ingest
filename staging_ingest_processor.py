@@ -27,17 +27,17 @@ spark = SparkSession\
 conf = spark.conf
 sqlContext = SQLContext(spark)
 
-plan_path = conf.get("spark.nyec.iqvia.plans_ingest_path")
-patient_path = conf.get("spark.nyec.iqvia.patients_ingest_path")
-claim_path = conf.get("spark.nyec.iqvia.claims_ingest_path")
-procedure_path = conf.get("spark.nyec.iqvia.procs_ingest_path")
-proc_modifier_path = conf.get("spark.nyec.iqvia.proc_mod_ingest_path")
-diagnosis_path = conf.get("spark.nyec.iqvia.diags_ingest_path")
-drug_path = conf.get("spark.nyec.iqvia.drugs_ingest_path")
-provider_path = conf.get("spark.nyec.iqvia.providers_ingest_path")
+plan_path = conf.get("spark.nyec.iqvia.raw_plan_ingest_path")
+patient_path = conf.get("spark.nyec.iqvia.raw_patient_ingest_path")
+claim_path = conf.get("spark.nyec.iqvia.raw_claim_ingest_path")
+procedure_path = conf.get("spark.nyec.iqvia.raw_procedure_ingest_path")
+proc_modifier_path = conf.get("spark.nyec.iqvia.raw_procedure_modifier_ingest_path")
+diagnosis_path = conf.get("spark.nyec.iqvia.raw_diagnosis_ingest_path")
+drug_path = conf.get("spark.nyec.iqvia.raw_drug_ingest_path")
+provider_path = conf.get("spark.nyec.iqvia.raw_provider_ingest_path")
 iqvia_curated_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_curated_s3_prefix")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
-# pro_provider_path = conf.get("spark.nyec.iqvia.pro_provider_ingest_path")
+# raw_pro_provider_ingest_path = conf.get("spark.nyec.iqvia.raw_pro_provider_ingest_path")
 
 def generate_output_path(data_set_name: str) -> str:
     return f'{iqvia_curated_s3_prefix}/{data_set_name}/'

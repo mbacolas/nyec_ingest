@@ -13,14 +13,14 @@ conf = spark.conf
 
 file_parsing_delimiter = conf.get("spark.nyec.file_delimiter", ',')
 
-plan_load_path = conf.get("spark.nyec.iqvia.raw_plans_ingest_path")
-patient_load_path = conf.get("spark.nyec.iqvia.raw_patients_ingest_path")
-claim_load_path = conf.get("spark.nyec.iqvia.raw_claims_ingest_path")
-procedure_load_path = conf.get("spark.nyec.iqvia.raw_procs_ingest_path")
-proc_modifier_load_path = conf.get("spark.nyec.iqvia.raw_proc_mod_ingest_path")
-diagnosis_load_path = conf.get("spark.nyec.iqvia.raw_diags_ingest_path")
-drug_load_path = conf.get("spark.nyec.iqvia.raw_drugs_ingest_path")
-provider_load_path = conf.get("spark.nyec.iqvia.raw_providers_ingest_path")
+plan_load_path = conf.get("spark.nyec.iqvia.raw_plan_ingest_path")
+patient_load_path = conf.get("spark.nyec.iqvia.raw_patient_ingest_path")
+claim_load_path = conf.get("spark.nyec.iqvia.raw_claim_ingest_path")
+procedure_load_path = conf.get("spark.nyec.iqvia.raw_procedure_ingest_path")
+proc_modifier_load_path = conf.get("spark.nyec.iqvia.raw_procedure_modifier_ingest_path")
+diagnosis_load_path = conf.get("spark.nyec.iqvia.raw_diagnosis_ingest_path")
+drug_load_path = conf.get("spark.nyec.iqvia.raw_drug_ingest_path")
+provider_load_path = conf.get("spark.nyec.iqvia.raw_provider_ingest_path")
 pro_provider_load_path = conf.get("spark.nyec.iqvia.raw_pro_provider_ingest_path")
 
 iqvia_processed_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_processed_s3_prefix")
