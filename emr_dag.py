@@ -78,11 +78,11 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
+    return  f'{prefix}/{data_set_name}/20220809'
+    # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
 iqvia_curated_s3_prefix = Variable.get('iqvia_curated_s3_prefix')
-
 
 TO_PROCESSED_SPARK_STEPS = [
     {
@@ -187,6 +187,7 @@ TO_CURATED_SPARK_STEPS = [
     }
 ]
 
+
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -194,7 +195,7 @@ default_args = {
     'retries': 0,
     'retry_delay': timedelta(minutes=2),
     'provide_context': True,
-    'email': ['mannys@slalom.com'],
+    'email': ['bulent_da_man@slalom.com'],
     'email_on_failure': True,
     'email_on_retry': False,
     'schedule_interval': None
@@ -208,16 +209,16 @@ emr_dag = DAG(
     # schedule_interval=timedelta(minutes=10)
 )
 
-create_procssed_cluster = EmrCreateJobFlowOperator(
-    task_id='create_emr_cluster',
+create_processed_emr_cluster = EmrCreateJobFlowOperator(
+    task_id='create_processed_emr_cluster',
     job_flow_overrides=JOB_FLOW_OVERRIDES,
     aws_conn_id='aws_default',
     emr_conn_id='emr_test',
     dag=emr_dag
 )
 
-create_curated_cluster = EmrCreateJobFlowOperator(
-    task_id='create_emr_cluster',
+create_curated_emr_cluster = EmrCreateJobFlowOperator(
+    task_id='create_curated_emr_cluster',
     job_flow_overrides=JOB_FLOW_OVERRIDES,
     aws_conn_id='aws_default',
     emr_conn_id='emr_test',
@@ -225,22 +226,20 @@ create_curated_cluster = EmrCreateJobFlowOperator(
 )
 
 trigger_processed_emr_job = EmrAddStepsOperator(
-    task_id='curate',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+    task_id='trigger_processed_emr_job',
+    job_flow_id="{{ task_instance.xcom_pull('create_processed_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
     steps=TO_PROCESSED_SPARK_STEPS,
     dag=emr_dag
 )
 
 trigger_curated_emr_job = EmrAddStepsOperator(
-    task_id='curate',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+    task_id='trigger_curated_emr_job',
+    job_flow_id="{{ task_instance.xcom_pull('create_curated_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
     steps=TO_CURATED_SPARK_STEPS,
     dag=emr_dag
 )
-
-
 
 # cluster_remover = EmrTerminateJobFlowOperator(
 #     task_id='remove_cluster',
@@ -262,11 +261,10 @@ trigger_curated_emr_job = EmrAddStepsOperator(
 #     aws_conn_id='aws_default',
 #     dag=dag
 # )
-
 def push():
-    # iqvia_data_types = Variable.get("iqvia_data_types", deserialize_json=True)
-    # print(f'------------------------------------------ >>> {type(iqvia_data_types)}')
-    print(f'------------------------------------------ >>> {SPARK_STEPS}')
+    print(f'-----------------------------------------_>>>> JOB_FLOW_OVERRIDES: {JOB_FLOW_OVERRIDES}')
+    print(f'-----------------------------------------_>>>> TO_PROCESSED_SPARK_STEPS: {TO_PROCESSED_SPARK_STEPS}')
+    print(f'-----------------------------------------_>>>> TO_CURATED_SPARK_STEPS: {TO_CURATED_SPARK_STEPS}')
 
 
 push1 = PythonOperator(
@@ -276,8 +274,4 @@ push1 = PythonOperator(
     python_callable=push,
 )
 
-push1 >> [create_procssed_cluster, create_curated_cluster] >> [trigger_processed_emr_job, trigger_curated_emr_job]
-
-#
-
-# create_cluster >> trigger_curate_emr_job
+push1 >> create_processed_emr_cluster >> create_curated_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]
