@@ -188,10 +188,10 @@ practitioner_role_df = to_practitioner_role_row(currated_df)
 save_provider_role(currated_df, generate_output_path('provider'))
 save_provider(practitioner_role_df, generate_output_path('provider_role'))
 
+patient_claims_raw_rdd.unpersist(False)
 currated_df.unpersist(False)
 practitioner_rdd.unpersist(False)
 practitioner_role_df.unpersist(False)
-patient_claims_raw_rdd.unpersist(False)
 ###
 
 

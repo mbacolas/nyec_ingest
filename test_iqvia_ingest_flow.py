@@ -48,7 +48,7 @@ JOB_FLOW_OVERRIDES = {
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
                 "InstanceType": "m5.xlarge",
-                "InstanceCount": 6
+                "InstanceCount": 7
             }
         ],
         "Ec2SubnetId": subnetID['Parameter']['Value'],
