@@ -12,7 +12,7 @@ all_codes = {}
 all_code_systems = {'ICD10'}
 NDC = 'NDC'
 
-def str_to_date(date_raw: str, source_column_name: str, is_requied=True, date_format="%Y-%m-%d") -> Either:
+def str_to_date(date_raw: str, source_column_name: str, is_requied=True, date_format="%Y%m%d") -> Either:
     try:
         if not is_requied and date_raw is None:
             return Right(None)

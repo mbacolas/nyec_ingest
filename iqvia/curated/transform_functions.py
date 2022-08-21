@@ -251,8 +251,8 @@ def is_inpatient(hosp_admt_dt: str):
 
 def _to_patient_row(patient_plan: Row) -> Row:
     # org_oid = is_valid(patient_plan.IMS_PAYER_ID, 'IMS_PAYER_ID')
-    dob = str_to_date(f'{patient_plan.PAT_BRTH_YR_NBR}-01-01', 'patient.dob', '%Y-%m-%d')
-    gender = Right(patient_plan.PAT_GENDER_CD) #is_included(patient_plan.PAT_GENDER_CD, 'PAT_GENDER_CD', ['M', 'F', 'U'])
+    dob = str_to_date(f'{patient_plan.PAT_BRTH_YR_NBR}-01-01', 'patient.dob', date_format='%Y-%m-%d')
+    gender = is_included(patient_plan.PAT_GENDER_CD, 'PAT_GENDER_CD', ['M', 'F', 'U'])
     validation_errors = extract_left(*[dob, gender])
     validation_warnings = []
     valid = is_record_valid(validation_errors)
@@ -341,9 +341,9 @@ def to_cost(claim_row_rdd: RDD) -> RDD:
 def _to_claim_row(claim_row: Row) -> Row:
     source_claim_type = to_claim_type(claim_row.CLAIM_TYP_CD)
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
-    to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
-    admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', False)
-    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', False) #should be True
+    to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', is_requied=False)
+    admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', is_requied=False)
+    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', is_requied=False) #should be True
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
@@ -375,8 +375,8 @@ def _to_claim_row(claim_row: Row) -> Row:
                             end_date=to_date_result.value,
                             admission_date_raw=claim_row.HOSP_ADMT_DT,
                             admission_date=admission_date_result.value,
-                            discharge_date_raw=discharge_date_result.value,
-                            discharge_date=claim_row.HOSP_DISCHG_DT,
+                            discharge_date_raw=claim_row.HOSP_DISCHG_DT,
+                            discharge_date=discharge_date_result.value,
                             units_of_service_raw=claim_row.UNIT_OF_SVC_AMT,
                             units_of_service=claim_row.UNIT_OF_SVC_AMT,
                             facility_type_cd_raw=claim_row.FCLT_TYP_CD,

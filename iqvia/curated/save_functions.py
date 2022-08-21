@@ -9,7 +9,6 @@ from pymonad.either import *
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
     MapType, BooleanType, DecimalType, TimestampType
 
-
 def save_errors(rdd: RDD, row_type: str, output_path: str):
     rdd.filter(lambda r: r.is_valid == False) \
         .map(lambda r: Row(batch_id=r.batch_id,
