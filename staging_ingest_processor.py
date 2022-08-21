@@ -59,7 +59,7 @@ org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
 raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema) #.limit(1000000)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema) #.limit(100)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
 raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema)
@@ -87,12 +87,12 @@ save_errors(currated_patient_rdd, PATIENT, generate_output_path('error'))
 patient_rdd.unpersist()
 currated_patient_rdd.unpersist()
 currated_patient_df.unpersist()
-
+print('------------------------>>>>>>> saved patient')
 ### create clinical events
 patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
     .join(raw_diag_df, on=[raw_claim_df.DIAG_CD == raw_diag_df.DIAG_CD, raw_claim_df.DIAG_VERS_TYP_ID == raw_diag_df.DIAG_VERS_TYP_ID],
           how="left_outer") \
-    .join(raw_proc_df, on=[raw_claim_df.PRC_CD == raw_proc_df.PRC_CD, raw_proc_df.PRC_VERS_TYP_ID == raw_proc_df.PRC_VERS_TYP_ID],
+    .join(raw_proc_df, on=[raw_claim_df.PRC_CD == raw_proc_df.PRC_CD, raw_claim_df.PRC_VERS_TYP_ID == raw_proc_df.PRC_VERS_TYP_ID],
           how="left_outer") \
     .join(raw_proc_mod_1_df, on=[raw_claim_df.PRC1_MODR_CD == raw_proc_mod_1_df.PRC1_MODR_CD], how="left_outer") \
     .join(raw_proc_mod_2_df, on=[raw_claim_df.PRC2_MODR_CD == raw_proc_mod_2_df.PRC2_MODR_CD], how="left_outer") \
@@ -121,7 +121,7 @@ currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.ME
 save_procedure(currated_df, generate_output_path('procedure'))
 currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
-
+print('------------------------>>>>>>> saved procs')
 ### problems
 problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(problem_rdd, PROBLEM, generate_output_path('error'))
@@ -137,6 +137,7 @@ save_problem(currated_df, generate_output_path('diagnosis'))
 currated_df.unpersist(False)
 problem_rdd.unpersist(False)
 admitting_problem_rdd.unpersist(False)
+print('------------------------>>>>>>> saved problems')
 ####
 
 ### drug
@@ -149,7 +150,7 @@ save_drug(currated_df, generate_output_path('product'))
 currated_df.unpersist(False)
 drug_rdd.unpersist(False)
 ####
-
+print('------------------------>>>>>>> saved drugs')
 ### cost
 cost_rdd = to_cost(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(cost_rdd, COST, generate_output_path('error'))
@@ -160,7 +161,7 @@ save_cost(currated_df, generate_output_path('cost'))
 currated_df.unpersist(False)
 cost_rdd.unpersist(False)
 ####
-
+print('------------------------>>>>>>> saved cost')
 ### claim
 claim_record_rdd = to_claim(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(claim_record_rdd, CLAIM, generate_output_path('error'))
@@ -171,7 +172,7 @@ save_claim(currated_df, generate_output_path('claim'))
 currated_df.unpersist(False)
 claim_record_rdd.unpersist(False)
 ###
-
+print('------------------------>>>>>>> saved claim')
 ### org
 save_org(org_df, generate_output_path('org'))
 org_df.unpersist()

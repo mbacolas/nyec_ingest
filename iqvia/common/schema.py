@@ -108,9 +108,21 @@ raw_pro_provider_schema = StructType([
     StructField("TIER_ID", StringType())
 ])
 
+stage_procedure__modifier_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_org_oid", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("start_date", DateType()),
+    StructField("to_date", DateType()),
+    StructField("code", StringType()),
+    StructField("code_system", StringType()),
+    StructField("mod", StringType()),
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
+])
 
 stage_procedure_schema = StructType([
-    StructField("row_id", StringType()),
+    StructField("id", StringType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("start_date_raw", StringType()),

@@ -4,7 +4,7 @@ from pyspark.sql.functions import *
 from pyspark.sql import DataFrame
 import uuid
 from common.functions import *
-from iqvia.common.schema import error_schema, stage_procedure_schema
+from iqvia.common.schema import error_schema, stage_procedure__modifier_schema
 from pymonad.either import *
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
     MapType, BooleanType, DecimalType, TimestampType
@@ -86,21 +86,25 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
 
 def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str):
     currated_procedure_mods_rdd.filter(lambda r: r.is_valid == False)\
-                                .flatMap(lambda r: r.mod)\
-                                .map(lambda r: Row(id=r.id,
-                                                   source_org_oid=r.source_org_oid,
-                                                   start_date=r.start_date,
-                                                   to_date=r.to_date,
-                                                   code=r.code,
-                                                   code_system=r.code_system,
-                                                   mod=r.mod,
-                                                   date_created=r.date_created)) \
-                                .toDF(stage_procedure_schema)\
+                                .filter(lambda r: len(r.mod) > 0)\
+                                .flatMap(lambda r: map(lambda y: Row(id=r.id,
+                                                                     source_org_oid=r.source_org_oid,
+                                                                     source_consumer_id=r.source_consumer_id,
+                                                                     start_date=r.start_date,
+                                                                     to_date=r.to_date,
+                                                                     code=r.code,
+                                                                     code_system=r.code_system,
+                                                                     mod=y,
+                                                                     batch_id=r.batch_id,
+                                                                     date_created=r.date_created), r.mod))\
+                                .toDF(stage_procedure__modifier_schema) \
                                 .repartition(col('source_org_oid'), col('source_consumer_id')) \
-                                .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
-                                col('code')) \
+                                .sortWithinPartitions(col('source_org_oid'),
+                                                      col('source_consumer_id'),
+                                                      col('start_date'),
+                                                      col('code_system'),
+                                                      col('code')) \
                                 .write.parquet(output_path, mode='overwrite')
-
 
 def save_problem(currated_problem_df: DataFrame, output_path: str):
     currated_problem_df.filter(currated_problem_df.is_valid == True) \
