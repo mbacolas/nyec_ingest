@@ -9,18 +9,19 @@ from pymonad.either import *
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
     MapType, BooleanType, DecimalType, TimestampType
 
-def save_errors(rdd: RDD, row_type: str):
-    pass
-    # rdd.filter(lambda r: r.is_included == False) \
-    #     .map(lambda r: Row(batch_id=r.batch_id,
-    #                        type=row_type,
-    #                        row_errors=json.dumps(r.error),
-    #                        row_value=json.dumps(r.asDict()),
-    #                        date_created=datetime.now())) \
-    #     .toDF(error_schema) \
-    #     .write\
-    #     .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
 
+def save_errors(rdd: RDD, row_type: str, output_path: str):
+    rdd.filter(lambda r: r.is_included == False) \
+        .map(lambda r: Row(batch_id=r.batch_id,
+                           type=row_type,
+                           row_errors=json.dumps(r.error),
+                           row_value=json.dumps(r.asDict()),
+                           date_created=r.date_created)) \
+        .toDF(error_schema) \
+        .write\
+        .parquet(output_path, mode='overwrite')
+
+        # .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
     # rdd.filter(lambda r: r.is_included == False) \
     #     .map(lambda r: Row(batch_id=r.batch_id,
     #                        type=row_type,
@@ -30,11 +31,11 @@ def save_errors(rdd: RDD, row_type: str):
     #     .toDF(error_schema) \
     #     .write\
     #     .format("jdbc") \
-    #     .option("url", "jdbc:postgresql://localhost:5432/postgres") \
+    #     .option("url", "jdbc:postgresql://nyec-rds-wflow-instance-1.c3urb70usat2.us-east-1.rds.amazonaws.com:5432/nyec_wflow") \
     #     .option("driver", "org.postgresql.Driver") \
     #     .option("dbtable", "public.error") \
-    #     .option("user", "postgres") \
-    #     .option("password", "mysecretpassword") \
+    #     .option("user", "nyec_admin") \
+    #     .option("password", "Packard007$") \
     #     .mode("append") \
     #     .save()
 

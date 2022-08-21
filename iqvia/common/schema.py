@@ -163,7 +163,7 @@ error_schema = StructType([
     StructField("type", StringType()),
     StructField("row_errors", StringType()),
     StructField("row_value", StringType()),
-    StructField("date_created", TimestampType())
+    StructField("date_created", DateType())
 ])
 
 stage_drug_schema = StructType([
@@ -223,8 +223,8 @@ stage_patient_schema = StructType([
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("type", StringType()),
-    StructField("active", BooleanType()),
-    StructField("dob_raw", DateType()),
+    StructField("active", StringType()),
+    StructField("dob_raw", StringType()),
     StructField("dob", DateType()),
     StructField("gender_raw", StringType()),
     StructField("gender", StringType()),
@@ -268,13 +268,13 @@ stage_claim_schema = StructType([
     StructField("type", StringType()),
     StructField("sub_type_raw", StringType()),
     StructField("sub_type", StringType()),
-    StructField("start_date_raw", DateType()),
+    StructField("start_date_raw", StringType()),
     StructField("start_date", DateType()),
-    StructField("end_date_raw", DateType()),
+    StructField("end_date_raw", StringType()),
     StructField("end_date", DateType()),
-    StructField("admission_date_raw", DateType()),
+    StructField("admission_date_raw", StringType()),
     StructField("admission_date", DateType()),
-    StructField("discharge_date_raw", DateType()),
+    StructField("discharge_date_raw", StringType()),
     StructField("discharge_date", DateType()),
     StructField("units_of_service_raw", StringType()),
     StructField("units_of_service", StringType()),
@@ -301,6 +301,7 @@ stage_provider_schema = StructType([
     StructField("first_name", StringType()),
     StructField("last_name", StringType()),
     StructField("source_provider_id", StringType()),
+    StructField("provider_type_raw", StringType()),
     StructField("provider_type", StringType()),
     StructField("role", StringType()),
     StructField("claim_identifier", StringType()),

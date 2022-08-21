@@ -54,7 +54,7 @@ assert expected_header == header_fields
 
 ### create data frames
 date_created = datetime.now()
-org_data = [("IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id)]
+org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id, date_created)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
@@ -82,7 +82,7 @@ patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id))\
 currated_patient_df = to_patient(patient_rdd).toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
 save_patient(currated_patient_df, generate_output_path('patient'))
-save_errors(patient_rdd, PATIENT)
+save_errors(patient_rdd, PATIENT, generate_output_path('error'))
 
 patient_rdd.unpersist()
 currated_patient_df.unpersist()
@@ -105,7 +105,7 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
     .join(raw_plan_df,
           on=[raw_plan_df.PLAN_ID == raw_claim_df.PLAN_ID_CLAIM], how="left_outer") \
     .withColumn('batch_id', lit(batch_id)) \
-    .withColumn('date_created', date_created)\
+    .withColumn('date_created', lit(date_created))\
     .rdd\
     .persist(StorageLevel.MEMORY_AND_DISK)
 
@@ -113,7 +113,7 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
 
 ### create procedure
 procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(procedure_rdd, PROCEDURE)
+save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
 currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
 save_procedure(currated_df, generate_output_path('procedure'))
@@ -124,9 +124,9 @@ procedure_rdd.unpersist(False)
 
 ### problems
 problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(problem_rdd, PROBLEM)
+save_errors(problem_rdd, PROBLEM, generate_output_path('error'))
 admitting_problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(admitting_problem_rdd, PROBLEM)
+save_errors(admitting_problem_rdd, PROBLEM, generate_output_path('error'))
 
 currated_df = problem_rdd.union(admitting_problem_rdd)\
                          .toDF(stage_problem_schema)\
@@ -141,7 +141,7 @@ admitting_problem_rdd.unpersist(False)
 
 ### drug
 drug_rdd = to_drug(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(drug_rdd, DRUG)
+save_errors(drug_rdd, DRUG, generate_output_path('error'))
 currated_df = drug_rdd.toDF(stage_drug_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
 save_drug(currated_df, generate_output_path('product'))
@@ -152,7 +152,7 @@ drug_rdd.unpersist(False)
 
 ### cost
 cost_rdd = to_cost(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(cost_rdd, COST)
+save_errors(cost_rdd, COST, generate_output_path('error'))
 currated_df = cost_rdd.toDF(stage_cost_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
 save_cost(currated_df, generate_output_path('cost'))
@@ -163,7 +163,7 @@ cost_rdd.unpersist(False)
 
 ### claim
 claim_record_rdd = to_claim(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(claim_record_rdd, CLAIM)
+save_errors(claim_record_rdd, CLAIM, generate_output_path('error'))
 currated_df = claim_record_rdd.toDF(stage_claim_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
 save_claim(currated_df, generate_output_path('claim'))
@@ -180,7 +180,7 @@ org_df.unpersist()
 
 ### provider
 practitioner_rdd = to_practitioner(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(practitioner_rdd, PRACTIONER)
+save_errors(practitioner_rdd, PRACTIONER, generate_output_path('error'))
 currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
 practitioner_role_df = to_practitioner_role_row(currated_df)
