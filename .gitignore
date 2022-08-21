@@ -145,3 +145,4 @@ cython_debug/
 logs/
 test.py
 *.iml
+*.zip

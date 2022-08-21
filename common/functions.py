@@ -169,7 +169,7 @@ def validate_admission_type_cd(cd: str) -> Either:
         5	Trauma Center - visits to a trauma center/hospital as licensed or designated by the State or local government authority authorized to do so, or as verified by the American College of Surgeons and involving a trauma activation.
         6   THRU 8	Reserved
         9	Unknown - Information not available."""
-    pass
+    return Right(cd)
 
 
 # RENDERING_PROVIDER_TYP_ID

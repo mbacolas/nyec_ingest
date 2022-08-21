@@ -7,6 +7,7 @@ from pyspark import StorageLevel
 from iqvia.claim_service import claims_header
 from pymonad.either import *
 import uuid
+from datetime import datetime
 
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
@@ -52,12 +53,13 @@ assert expected_header == header_fields
 
 
 ### create data frames
-org_data = [("IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True)]
+date_created = datetime.now()
+org_data = [("IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).limit(10000)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(10000)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
 raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema)
@@ -70,27 +72,23 @@ raw_rendering_provider_df = load_rendering_provider(provider_raw)
 raw_referring_provider_df = load_referring_provider(provider_raw)
 ### end of create data frames
 
-
 ### create stage patient DF
 patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id))\
                             .withColumn('source_org_oid', lit('IQVIA'))\
+                            .withColumn('date_created', lit(date_created))\
                             .rdd\
                             .persist(StorageLevel.MEMORY_AND_DISK)
 
 currated_patient_df = to_patient(patient_rdd).toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
-print(f'------------------>>>> currated_patient_df.first(): {currated_patient_df.first()}')
 
-save_errors(patient_rdd, PATIENT)
 save_patient(currated_patient_df, generate_output_path('patient'))
+save_errors(patient_rdd, PATIENT)
 
 patient_rdd.unpersist()
 currated_patient_df.unpersist()
-raw_patient_df.drop(col('batch_id'))
-raw_patient_df.drop(col('source_org_oid'))
 
 ### create clinical events
 patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
-    .join(raw_plan_df, on=[raw_claim_df.PLAN_ID == raw_plan_df.PLAN_ID], how="left_outer") \
     .join(raw_diag_df, on=[raw_claim_df.DIAG_CD == raw_diag_df.DIAG_CD, raw_claim_df.DIAG_VERS_TYP_ID == raw_diag_df.DIAG_VERS_TYP_ID],
           how="left_outer") \
     .join(raw_proc_df, on=[raw_claim_df.PRC_CD == raw_proc_df.PRC_CD, raw_proc_df.PRC_VERS_TYP_ID == raw_proc_df.PRC_VERS_TYP_ID],
@@ -101,12 +99,13 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
     .join(raw_proc_mod_4_df, on=[raw_claim_df.PRC4_MODR_CD == raw_proc_mod_4_df.PRC4_MODR_CD], how="left_outer") \
     .join(raw_drug_df, on=[raw_claim_df.NDC_CD == raw_drug_df.NDC_CD], how="left_outer") \
     .join(raw_rendering_provider_df,
-          on=[raw_claim_df.RENDERING_PROVIDER_ID == raw_rendering_provider_df.RENDERING_PROVIDER_ID_REF], how="left_outer") \
+          on=[raw_claim_df.RENDERING_PROVIDER_ID == raw_rendering_provider_df.RENDERING_PROVIDER_ID], how="left_outer") \
     .join(raw_referring_provider_df,
-          on=[raw_claim_df.REFERRING_PROVIDER_ID == raw_referring_provider_df.REFERRING_PROVIDER_ID_REF], how="left_outer") \
+          on=[raw_claim_df.REFERRING_PROVIDER_ID == raw_referring_provider_df.REFERRING_PROVIDER_ID], how="left_outer") \
     .join(raw_plan_df,
           on=[raw_plan_df.PLAN_ID == raw_claim_df.PLAN_ID_CLAIM], how="left_outer") \
     .withColumn('batch_id', lit(batch_id)) \
+    .withColumn('date_created', date_created)\
     .rdd\
     .persist(StorageLevel.MEMORY_AND_DISK)
 

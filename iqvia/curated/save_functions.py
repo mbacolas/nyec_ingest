@@ -6,17 +6,20 @@ import uuid
 from common.functions import *
 from iqvia.common.schema import error_schema
 from pymonad.either import *
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
+    MapType, BooleanType, DecimalType, TimestampType
 
 def save_errors(rdd: RDD, row_type: str):
-    rdd.filter(lambda r: r.is_included == False) \
-        .map(lambda r: Row(batch_id=r.batch_id,
-                           type=row_type,
-                           row_errors=json.dumps(r.error),
-                           row_value=json.dumps(r.asDict()),
-                           date_created=datetime.now())) \
-        .toDF(error_schema) \
-        .write\
-        .parquet('s3://nyce-iqvia/processed-parquet/error', mode='overwrite')
+    pass
+    # rdd.filter(lambda r: r.is_included == False) \
+    #     .map(lambda r: Row(batch_id=r.batch_id,
+    #                        type=row_type,
+    #                        row_errors=json.dumps(r.error),
+    #                        row_value=json.dumps(r.asDict()),
+    #                        date_created=datetime.now())) \
+    #     .toDF(error_schema) \
+    #     .write\
+    #     .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
 
     # rdd.filter(lambda r: r.is_included == False) \
     #     .map(lambda r: Row(batch_id=r.batch_id,
@@ -36,17 +39,17 @@ def save_errors(rdd: RDD, row_type: str):
     #     .save()
 
 def save_org(org_df: DataFrame, output_path: str):
-    org_df.select(col('source_org_oid'),
-            col('name'),
-            col('type'),
-            col('active')) \
+    org_df.select(  col('id'),
+                    col('source_org_oid'),
+                    col('name'),
+                    col('type'),
+                    col('active'),
+                    col('batch_id'),
+                    col('date_created')) \
         .write\
         .parquet(output_path, mode='overwrite')
 
 def save_patient(currated_patient_df: DataFrame, output_path: str):
-    print(f'--------------------->>>> output_path {output_path}')
-    print(f'--------------------->>>> currated_patient_df {currated_patient_df.first()}')
-
     currated_patient_df.filter(currated_patient_df.is_valid == True) \
         .select(col('source_consumer_id'),
                 col('source_org_oid'),
@@ -147,6 +150,7 @@ def save_cost(currated_cost_df: DataFrame, output_path: str):
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
                               col('service_number'))\
         .write.parquet(output_path, mode='overwrite')
+
 
 def save_claim(currated_claim_df: DataFrame, output_path: str):
     currated_claim_df.filter(currated_claim_df.is_valid == True) \

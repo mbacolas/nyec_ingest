@@ -12,8 +12,11 @@ from airflow.operators.python import PythonOperator
 # from airflow.providers.amazon.aws.operators.e import EmrTerminateJobFlowOperator
 from airflow.providers.amazon.aws.operators.emr_create_job_flow import EmrCreateJobFlowOperator
 from airflow.providers.amazon.aws.operators.emr_add_steps import EmrAddStepsOperator
+
 from airflow.providers.amazon.aws.sensors.emr_step import EmrStepSensor
 from airflow.providers.amazon.aws.operators import glue_crawler
+from airflow.providers.amazon.aws.transfers import s3_to_redshift
+from airflow.providers.amazon.aws.transfers.s3_to_redshift import *
 
 execution_date = "{{ execution_date }}"
 
@@ -45,7 +48,7 @@ JOB_FLOW_OVERRIDES = {
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
                 "InstanceType": "m5.xlarge",
-                "InstanceCount": 1
+                "InstanceCount": 6
             }
         ],
         "Ec2SubnetId": subnetID['Parameter']['Value'],
@@ -61,7 +64,7 @@ JOB_FLOW_OVERRIDES = {
     ],
     'BootstrapActions': [
         {
-            'Name': 'pip-install',
+            'Name': 'pip-install-dependencies',
             'ScriptBootstrapAction': {
                 'Path': 's3://nyec-scripts/bootstrap/bootstrap.sh',
             }
@@ -72,13 +75,14 @@ JOB_FLOW_OVERRIDES = {
 S3_URI = "s3://{}/scripts/emr/".format(S3_BUCKET_NAME)
 
 def generate_date_path(data_set_name):
-    prefix = Variable.get('iqvia_raw_s3_prefix')
+    # prefix = Variable.get('iqvia_raw_s3_prefix')
+    prefix = ''
     from datetime import date
     curr_dt = date.today()
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    return  f'{prefix}/{data_set_name}/20220809'
+    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
@@ -126,6 +130,9 @@ TO_PROCESSED_SPARK_STEPS = [
 
                     '--conf',
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
+
+                     '--py-files',
+                     '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
 
                      '/home/hadoop/iqvia_raw_to_parquet_processor.py'
                      ]
@@ -178,6 +185,9 @@ TO_CURATED_SPARK_STEPS = [
                      '--conf',
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
+                     '--py-files',
+                     '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
+                     
                      '/home/hadoop/staging_ingest_processor.py'
                      ]
         }
@@ -199,7 +209,7 @@ default_args = {
 }
 
 emr_dag = DAG(
-    'iqvia_ingest_flow',
+    'test_iqvia_ingest_flow',
     default_args=default_args,
     dagrun_timeout=timedelta(hours=2),
     max_active_runs=1
@@ -258,18 +268,27 @@ trigger_curated_emr_job = EmrAddStepsOperator(
 #     aws_conn_id='aws_default',
 #     dag=dag
 # )
-def push():
-    print(f'-----------------------------------------_>>>> JOB_FLOW_OVERRIDES: {JOB_FLOW_OVERRIDES}')
-    print(f'-----------------------------------------_>>>> TO_PROCESSED_SPARK_STEPS: {TO_PROCESSED_SPARK_STEPS}')
-    print(f'-----------------------------------------_>>>> TO_CURATED_SPARK_STEPS: {TO_CURATED_SPARK_STEPS}')
+# def push():
+#     print(f'-----------------------------------------_>>>> JOB_FLOW_OVERRIDES: {JOB_FLOW_OVERRIDES}')
+#     print(f'-----------------------------------------_>>>> TO_PROCESSED_SPARK_STEPS: {TO_PROCESSED_SPARK_STEPS}')
+#     print(f'-----------------------------------------_>>>> TO_CURATED_SPARK_STEPS: {TO_CURATED_SPARK_STEPS}')
 
 
-push1 = PythonOperator(
-    task_id='push',
-    provide_context=True,
-    dag=emr_dag,
-    python_callable=push,
-)
+# push1 = PythonOperator(
+#     task_id='push',
+#     provide_context=True,
+#     dag=emr_dag,
+#     python_callable=push,
+# )
 
-push1 >>  create_curated_emr_cluster >> trigger_curated_emr_job
+# s3_patient_to_redshift = S3ToRedshiftOperator(
+#     s3_bucket=S3_BUCKET_NAME,
+#     s3_key=f'{iqvia_curated_s3_prefix}/patient',
+#     schema='PUBLIC',
+#     table='patient',
+#     copy_options=['parquet'],
+#     task_id='transfer_s3_to_redshift',
+# )
+
+create_curated_emr_cluster >> trigger_curated_emr_job
 # create_processed_emr_cluster >> create_curated_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]

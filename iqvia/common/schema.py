@@ -1,5 +1,5 @@
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
-    MapType, BooleanType, DecimalType
+    MapType, BooleanType, DecimalType, TimestampType
 
 raw_plan_schema = StructType([ \
     StructField("PLAN_ID", StringType()), \
@@ -131,7 +131,8 @@ stage_procedure_schema = StructType([
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 stage_problem_schema = StructType([
@@ -153,7 +154,8 @@ stage_problem_schema = StructType([
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 error_schema = StructType([
@@ -161,7 +163,7 @@ error_schema = StructType([
     StructField("type", StringType()),
     StructField("row_errors", StringType()),
     StructField("row_value", StringType()),
-    StructField("date_created", DateType())
+    StructField("date_created", TimestampType())
 ])
 
 stage_drug_schema = StructType([
@@ -188,28 +190,33 @@ stage_drug_schema = StructType([
     StructField("warning", StringType()),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 raw_org_schema = StructType([
-    StructField("source_org_oid", StringType()),
-    StructField("name", StringType()),
-    StructField("type", StringType()),
-    StructField("active", StringType())
-])
-
-stage_org_schema = StructType([
     StructField("id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("name", StringType()),
     StructField("type", StringType()),
     StructField("active", StringType()),
-    StructField("error", ArrayType(StringType())),
-    StructField("warning", ArrayType(StringType())),
-    StructField("is_valid", BooleanType()),
-    StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
+
+# stage_org_schema = StructType([
+#     StructField("id", StringType()),
+#     StructField("source_org_oid", StringType()),
+#     StructField("name", StringType()),
+#     StructField("type", StringType()),
+#     StructField("active", StringType()),
+#     StructField("error", ArrayType(StringType())),
+#     StructField("warning", ArrayType(StringType())),
+#     StructField("is_valid", BooleanType()),
+#     StructField("has_warnings", BooleanType()),
+#     StructField("batch_id", StringType()),
+#     StructField("date_created", DateType())
+# ])
 
 stage_patient_schema = StructType([
     StructField("id", StringType()),
@@ -217,13 +224,16 @@ stage_patient_schema = StructType([
     StructField("source_org_oid", StringType()),
     StructField("type", StringType()),
     StructField("active", BooleanType()),
+    StructField("dob_raw", DateType()),
     StructField("dob", DateType()),
+    StructField("gender_raw", StringType()),
     StructField("gender", StringType()),
     StructField("error", ArrayType(StringType())),
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 
@@ -239,7 +249,8 @@ stage_cost_schema = StructType([
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 
@@ -253,25 +264,38 @@ stage_claim_schema = StructType([
     StructField("plan_id", StringType()),
     StructField("claim_identifier", StringType()),
     StructField("service_number", StringType()),
+    StructField("type_raw", StringType()),
     StructField("type", StringType()),
+    StructField("sub_type_raw", StringType()),
     StructField("sub_type", StringType()),
+    StructField("start_date_raw", DateType()),
     StructField("start_date", DateType()),
+    StructField("end_date_raw", DateType()),
     StructField("end_date", DateType()),
+    StructField("admission_date_raw", DateType()),
     StructField("admission_date", DateType()),
+    StructField("discharge_date_raw", DateType()),
     StructField("discharge_date", DateType()),
-    StructField("units_of_service", DateType()),
-    StructField("facility_type_cd", DateType()),
+    StructField("units_of_service_raw", StringType()),
+    StructField("units_of_service", StringType()),
+    StructField("facility_type_cd_raw", StringType()),
+    StructField("facility_type_cd", StringType()),
+    StructField("admission_source_cd_raw", StringType()),
     StructField("admission_source_cd", StringType()),
+    StructField("admission_type_cd_raw", StringType()),
     StructField("admission_type_cd", StringType()),
+    StructField("place_of_service_raw", StringType()),
     StructField("place_of_service", StringType()),
     StructField("error", ArrayType(StringType())),
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 stage_provider_schema = StructType([
+    StructField("id", StringType()),
     StructField("npi", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("first_name", StringType()),
@@ -286,12 +310,14 @@ stage_provider_schema = StructType([
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
-    StructField("batch_id", StringType())
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
 ])
 
 stage_provider_role_schema = StructType([
     StructField("npi", StringType()),
     StructField("claim_identifier", StringType()),
     StructField("service_number", StringType()),
-    StructField("role", StringType())
+    StructField("role", StringType()),
+    StructField("date_created", DateType())
 ])

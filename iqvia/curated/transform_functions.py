@@ -68,8 +68,8 @@ def _to_procedure_row(claim_row: Row) -> Row:
     modifiers = [claim_row.PRC1_MODR_CD, claim_row.PRC2_MODR_CD, claim_row.PRC3_MODR_CD, claim_row.PRC4_MODR_CD]
     # modifiers = [{claim_row.PRC1_MODR_CD, claim_row.PRC2_MODR_CD, claim_row.PRC3_MODR_CD, claim_row.PRC4_MODR_CD]
     modifiers_clean = [i for i in modifiers if i is not None]
-    row_id = uuid.uuid4().hex[:12]
-    proc_row = Row(id=row_id,
+
+    proc_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
@@ -90,7 +90,8 @@ def _to_procedure_row(claim_row: Row) -> Row:
                    warning=validation_warnings,
                    is_valid=valid,
                    has_warnings=warn,
-                   batch_id=claim_row.batch_id)
+                   batch_id=claim_row.batch_id,
+                   date_created=claim_row.date_created)
     return proc_row
 
 
@@ -116,8 +117,8 @@ def _to_problem_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    row_id = uuid.uuid4().hex[:12]
-    diag_row = Row(id=row_id,
+
+    diag_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
@@ -135,7 +136,9 @@ def _to_problem_row(claim_row: Row) -> Row:
                    warning=validation_warnings,
                    is_valid=valid,
                    has_warnings=warn,
-                   batch_id=claim_row.batch_id)
+                   batch_id=claim_row.batch_id,
+                   date_created=claim_row.date_created)
+
     return diag_row
 
 
@@ -160,8 +163,7 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    row_id = uuid.uuid4().hex[:12]
-    diag_row = Row(id=row_id,
+    diag_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.HOSP_ADMT_DT,
@@ -179,7 +181,8 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
                    warning=validation_warnings,
                    is_valid=valid,
                    has_warnings=warn,
-                   batch_id=claim_row.batch_id)
+                   batch_id=claim_row.batch_id,
+                   date_created=claim_row.date_created)
     return diag_row
 
 
@@ -202,8 +205,7 @@ def _to_drug_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    row_id = uuid.uuid4().hex[:12]
-    drug_row = Row(id=row_id,
+    drug_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
@@ -226,7 +228,8 @@ def _to_drug_row(claim_row: Row) -> Row:
                    warning=validation_warnings,
                    is_valid=valid,
                    has_warnings=warn,
-                   batch_id=claim_row.batch_id)
+                   batch_id=claim_row.batch_id,
+                   date_created=claim_row.date_created)
     return drug_row
 
 
@@ -249,22 +252,26 @@ def is_inpatient(hosp_admt_dt: str):
 def _to_patient_row(patient_plan: Row) -> Row:
     # org_oid = is_valid(patient_plan.IMS_PAYER_ID, 'IMS_PAYER_ID')
     dob = str_to_date(f'{patient_plan.PAT_BRTH_YR_NBR}-01-01', 'patient.dob', '%Y-%m-%d')
-    gender = is_included(patient_plan.PAT_GENDER_CD, 'PAT_GENDER_CD', ['M', 'F', 'U'])
+    gender = Right(patient_plan.PAT_GENDER_CD) #is_included(patient_plan.PAT_GENDER_CD, 'PAT_GENDER_CD', ['M', 'F', 'U'])
     validation_errors = extract_left(*[dob, gender])
     validation_warnings = []
     valid = is_record_valid(validation_errors)
     warn = False
-    patient_row = Row(source_org_oid=patient_plan.source_org_oid,
+    patient_row = Row(id=uuid.uuid4().hex[:12],
+                      source_org_oid=patient_plan.source_org_oid,
                       source_consumer_id=patient_plan.PATIENT_ID,
                       type=patient_plan.consumer_type,
                       active=patient_plan.consumer_status,
+                      dob_raw=patient_plan.PAT_BRTH_YR_NBR,
                       dob=dob.value,
+                      gender_raw=patient_plan.PAT_GENDER_CD,
                       gender=gender.value,
                       error=validation_errors,
                       warning=validation_warnings,
                       is_valid=valid,
                       has_warnings=warn,
-                      batch_id=patient_plan.batch_id)
+                      batch_id=patient_plan.batch_id,
+                      date_created=patient_plan.date_created)
     return patient_row
 
 
@@ -274,22 +281,24 @@ def to_patient(patient_plan_rdd: RDD) -> RDD:
                         .reduceByKey((lambda a, b: a))\
                         .map(lambda r: r[1])
 
-
-def _to_org_row(patient_plan: Row) -> Row:
-    org_row = Row(source_org_oid=patient_plan.source_org_oid,
-                   name=patient_plan.source_org_oid,
-                   # name=patient_plan.IMS_PAYER_NM,
-                   type=patient_plan.org_type,
-                   active=True,
-                   error=[],
-                   warning=[],
-                   is_valid=True,
-                   has_warnings=False)
-    return org_row
-
-
-def to_org(patient_plan_rdd: RDD) -> RDD:
-    return patient_plan_rdd.map(lambda r: _to_org_row(r))
+# def _to_org_row(patient_plan: Row) -> Row:
+#     row_id = uuid.uuid4().hex[:12]
+#     org_row = Row(id=row_id,
+#                    source_org_oid=patient_plan.source_org_oid,
+#                    name=patient_plan.source_org_oid,
+#                    type=patient_plan.org_type,
+#                    active=True,
+#                    error=[],
+#                    warning=[],
+#                    is_valid=True,
+#                    has_warnings=False,
+#                    batch_id=patient_plan.batch_id,
+#                    date_created=patient_plan.date_created)
+#     return org_row
+#
+#
+# def to_org(patient_plan_rdd: RDD) -> RDD:
+#     return patient_plan_rdd.map(lambda r: _to_org_row(r))
 
 
 def _to_eligibility_row(patient_plan_rdd: Row) -> Row:
@@ -306,8 +315,7 @@ def _to_cost_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    row_id = uuid.uuid4().hex[:12]
-    cost_row = Row(id=row_id,
+    cost_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                     source_org_oid=claim_row.source_org_oid,
                     claim_identifier=claim_row.CLAIM_ID,
@@ -318,7 +326,8 @@ def _to_cost_row(claim_row: Row) -> Row:
                     warning=validation_warnings,
                     is_valid=valid,
                     has_warnings=warn,
-                    batch_id=claim_row.batch_id)
+                    batch_id=claim_row.batch_id,
+                    date_created=claim_row.date_created)
     return cost_row
 
 
@@ -331,7 +340,6 @@ def to_cost(claim_row_rdd: RDD) -> RDD:
 
 def _to_claim_row(claim_row: Row) -> Row:
     source_claim_type = to_claim_type(claim_row.CLAIM_TYP_CD)
-
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
     admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', False)
@@ -339,7 +347,6 @@ def _to_claim_row(claim_row: Row) -> Row:
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
-    row_id = uuid.uuid4().hex[:12]
     validation_errors = extract_left(*[source_claim_type,
                                        start_date_result,
                                        facility_type_cd_result,
@@ -349,7 +356,7 @@ def _to_claim_row(claim_row: Row) -> Row:
     validation_warnings = []
     warn = False
 
-    claim_stage_row = Row(id=row_id,
+    claim_stage_row = Row(id=uuid.uuid4().hex[:12],
                            source_consumer_id=claim_row.PATIENT_ID,
                             source_org_oid=claim_row.source_org_oid,
                             payer_name=claim_row.IMS_PAYER_NM,
@@ -358,21 +365,34 @@ def _to_claim_row(claim_row: Row) -> Row:
                             plan_id=claim_row.PLAN_ID,
                             claim_identifier=claim_row.CLAIM_ID,
                             service_number=claim_row.SVC_NBR,
+                            type_raw=claim_row.CLAIM_TYP_CD,
                             type=source_claim_type.value,
+                            sub_type_raw=claim_row.HOSP_ADMT_DT,
                             sub_type=is_inpatient(claim_row.HOSP_ADMT_DT),
+                            start_date_raw=claim_row.SVC_FR_DT,
                             start_date=start_date_result.value,
+                            end_date_raw=claim_row.SVC_TO_DT,
                             end_date=to_date_result.value,
+                            admission_date_raw=claim_row.HOSP_ADMT_DT,
                             admission_date=admission_date_result.value,
-                            discharge_date=discharge_date_result.value,
+                            discharge_date_raw=discharge_date_result.value,
+                            discharge_date=claim_row.HOSP_DISCHG_DT,
+                            units_of_service_raw=claim_row.UNIT_OF_SVC_AMT,
                             units_of_service=claim_row.UNIT_OF_SVC_AMT,
+                            facility_type_cd_raw=claim_row.FCLT_TYP_CD,
                             facility_type_cd=claim_row.FCLT_TYP_CD,
+                            admission_source_cd_raw=claim_row.ADMS_SRC_CD,
                             admission_source_cd=claim_row.ADMS_SRC_CD,
+                            admission_type_cd_raw=claim_row.ADMS_TYP_CD,
                             admission_type_cd=claim_row.ADMS_TYP_CD,
+                            place_of_service_raw=claim_row.PLACE_OF_SVC_NM,
                             place_of_service=claim_row.PLACE_OF_SVC_NM,
                             error=validation_errors,
                             warning=validation_warnings,
                             is_valid=valid,
-                            has_warnings=warn)
+                            has_warnings=warn,
+                            batch_id=claim_row.batch_id,
+                            date_created=claim_row.date_created)
     return claim_stage_row
 
 
@@ -393,7 +413,8 @@ def _to_practitioner_row(claim_row: Row) -> Row:
         validation_warnings = []
         warn = False
 
-        rendering_provider_row = Row(npi=claim_row.RENDERING_NPI,
+        rendering_provider_row = Row(id=uuid.uuid4().hex[:12],
+                                     npi=claim_row.RENDERING_NPI,
                                     source_org_oid=claim_row.source_org_oid,
                                     first_name=claim_row.RENDERING_FIRST_NM,
                                     last_name=claim_row.RENDERING_LAST_NM,
@@ -406,7 +427,9 @@ def _to_practitioner_row(claim_row: Row) -> Row:
                                     error=validation_errors,
                                     warning=validation_warnings,
                                     is_valid=valid,
-                                    has_warnings=warn)
+                                    has_warnings=warn,
+                                    batch_id=claim_row.batch_id,
+                                    date_created=claim_row.date_created)
         providers.append(rendering_provider_row)
 
     if claim_row.REFERRING_PROVIDER_ID is not None:
@@ -415,7 +438,8 @@ def _to_practitioner_row(claim_row: Row) -> Row:
         valid = is_record_valid(validation_errors)
         validation_warnings = []
         warn = False
-        ref_provider_row = Row(npi=claim_row.REFERRING_NPI,
+        ref_provider_row = Row(id=uuid.uuid4().hex[:12],
+                               npi=claim_row.REFERRING_NPI,
                                 source_org_oid=claim_row.source_org_oid,
                                 first_name=claim_row.REFERRING_FIRST_NM,
                                 last_name=claim_row.REFERRING_LAST_NM,
@@ -428,7 +452,9 @@ def _to_practitioner_row(claim_row: Row) -> Row:
                                 error=validation_errors,
                                 warning=validation_warnings,
                                 is_valid=valid,
-                                has_warnings=warn)
+                                has_warnings=warn,
+                                batch_id=claim_row.batch_id,
+                                date_created=claim_row.date_created)
         providers.append(ref_provider_row)
 
     return providers
@@ -443,4 +469,5 @@ def to_practitioner_role_row(practitioner_df: DataFrame) -> DataFrame:
     return practitioner_df.select(col('npi'),
                                    col('source_provider_id'),
                                    col('claim_identifier'),
-                                   col('role'))
+                                   col('role'),
+                                   col('date_created'))
