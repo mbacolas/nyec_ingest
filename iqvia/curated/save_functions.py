@@ -11,11 +11,11 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 
 
 def save_errors(rdd: RDD, row_type: str, output_path: str):
-    rdd.filter(lambda r: r.is_included == False) \
+    rdd.filter(lambda r: r.is_valid == False) \
         .map(lambda r: Row(batch_id=r.batch_id,
                            type=row_type,
-                           row_errors=json.dumps(r.error),
-                           row_value=json.dumps(r.asDict()),
+                           row_errors=json.dumps(str(r.error)),
+                           row_value=json.dumps(str(r.asDict())),
                            date_created=r.date_created)) \
         .toDF(error_schema) \
         .write\

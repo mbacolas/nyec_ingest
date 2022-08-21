@@ -58,8 +58,8 @@ org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREG
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).limit(10000)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(10000)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).limit(100000)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(1000000)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
 raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema)
@@ -79,12 +79,13 @@ patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id))\
                             .rdd\
                             .persist(StorageLevel.MEMORY_AND_DISK)
 
-currated_patient_df = to_patient(patient_rdd).toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
-
+currated_patient_rdd = to_patient(patient_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+currated_patient_df = currated_patient_rdd.toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_patient(currated_patient_df, generate_output_path('patient'))
-save_errors(patient_rdd, PATIENT, generate_output_path('error'))
+save_errors(currated_patient_rdd, PATIENT, generate_output_path('error'))
 
 patient_rdd.unpersist()
+currated_patient_rdd.unpersist()
 currated_patient_df.unpersist()
 
 ### create clinical events
