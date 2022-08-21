@@ -4,7 +4,7 @@ from pyspark.sql.functions import *
 from pyspark.sql import DataFrame
 import uuid
 from common.functions import *
-from iqvia.common.schema import error_schema
+from iqvia.common.schema import error_schema, stage_procedure_schema
 from pymonad.either import *
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
     MapType, BooleanType, DecimalType, TimestampType
@@ -51,7 +51,8 @@ def save_org(org_df: DataFrame, output_path: str):
 
 def save_patient(currated_patient_df: DataFrame, output_path: str):
     currated_patient_df.filter(currated_patient_df.is_valid == True) \
-        .select(col('source_consumer_id'),
+        .select(col('id'),
+                col('source_consumer_id'),
                 col('source_org_oid'),
                 col('type'),
                 col('active'),
@@ -66,7 +67,8 @@ def save_patient(currated_patient_df: DataFrame, output_path: str):
 
 def save_procedure(currated_procedure_df: DataFrame, output_path: str):
     currated_procedure_df.filter(currated_procedure_df.is_valid == True) \
-        .select(col('source_consumer_id'),
+        .select(col('id'),
+                col('source_consumer_id'),
                 col('source_org_oid'),
                 col('start_date'),
                 col('to_date'),
@@ -75,7 +77,6 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('revenue_code'),
                 col('desc'),
                 col('source_desc'),
-                col('mod'),
                 col('batch_id')) \
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
@@ -83,24 +84,28 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
         .write.parquet(output_path, mode='overwrite')
 
 
-def save_procedure_modifiers(currated_procedure_mods_df: DataFrame, output_path: str):
-    currated_procedure_mods_df.filter(currated_procedure_mods_df.is_valid == True) \
-        .select(col('source_org_oid'),
-                col('source_consumer_id'),
-                col('start_date'),
-                col('to_date'),
-                col('code'),
-                col('code_system'),
-                col('mod')) \
-        .repartition(col('source_org_oid'), col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
-                              col('code'))\
-        .write.parquet(output_path, mode='overwrite')
+def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str):
+    currated_procedure_mods_rdd.filter(lambda r: r.is_valid == False)\
+                                .flatMap(lambda r: r.mod)\
+                                .map(lambda r: Row(id=r.id,
+                                                   source_org_oid=r.source_org_oid,
+                                                   start_date=r.start_date,
+                                                   to_date=r.to_date,
+                                                   code=r.code,
+                                                   code_system=r.code_system,
+                                                   mod=r.mod,
+                                                   date_created=r.date_created)) \
+                                .toDF(stage_procedure_schema)\
+                                .repartition(col('source_org_oid'), col('source_consumer_id')) \
+                                .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('start_date'), col('code_system'),
+                                col('code')) \
+                                .write.parquet(output_path, mode='overwrite')
 
 
 def save_problem(currated_problem_df: DataFrame, output_path: str):
     currated_problem_df.filter(currated_problem_df.is_valid == True) \
-        .select(col('source_consumer_id'),
+        .select(col('id'),
+                col('source_consumer_id'),
                 col('source_org_oid'),
                 col('start_date'),
                 col('to_date'),

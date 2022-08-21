@@ -115,11 +115,10 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
 ### create procedure
 procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
+save_procedure_modifiers(procedure_rdd, generate_output_path('proceduremodifier'))
+
 currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
-
 save_procedure(currated_df, generate_output_path('procedure'))
-save_procedure_modifiers(currated_df, generate_output_path('proceduremodifier'))
-
 currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
 
@@ -192,6 +191,7 @@ save_provider(practitioner_role_df, generate_output_path('provider_role'))
 currated_df.unpersist(False)
 practitioner_rdd.unpersist(False)
 practitioner_role_df.unpersist(False)
+patient_claims_raw_rdd.unpersist(False)
 ###
 
 
