@@ -57,19 +57,25 @@ date_created = datetime.now()
 org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id, date_created)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
-raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
-raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
-raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
-raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema)
-raw_proc_mod_3_df = load_procedure_modifier3(spark, proc_modifier_path, raw_procedure_modifier_schema)
-raw_proc_mod_4_df = load_procedure_modifier4(spark, proc_modifier_path, raw_procedure_modifier_schema)
-raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
-raw_drug_df = load_diagnosis(spark, drug_path, raw_drug_schema)
+raw_plan_df = load_plan(spark, plan_path, raw_plan_schema).repartition('PLAN_ID')
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID')
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).repartition('PATIENT_ID_CLAIM').limit(1000000)
+raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema).repartition('PRC_CD', 'PRC_VERS_TYP_ID')
+raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC1_MODR_CD')
+raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC2_MODR_CD')
+raw_proc_mod_3_df = load_procedure_modifier3(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC3_MODR_CD')
+raw_proc_mod_4_df = load_procedure_modifier4(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC4_MODR_CD')
+raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema).repartition('DIAG_CD', 'DIAG_VERS_TYP_ID')
+raw_drug_df = load_drug(spark, drug_path, raw_drug_schema).repartition('NDC_CD')
 provider_raw = load_provider(spark, provider_path, raw_provider_schema)
-raw_rendering_provider_df = load_rendering_provider(provider_raw)
-raw_referring_provider_df = load_referring_provider(provider_raw)
+raw_rendering_provider_df = load_rendering_provider(provider_raw).repartition('RENDERING_PROVIDER_ID')
+raw_referring_provider_df = load_referring_provider(provider_raw).repartition('REFERRING_PROVIDER_ID')
+
+raw_plan_df.collect()
+States = {"DL":"Delhi", "RJ":"Rajasthan", "KA":"Karnataka"}
+
+broadcast_states = spark.sparkContext.broadcast(States)
+
 ### end of create data frames
 
 ### create stage patient DF
