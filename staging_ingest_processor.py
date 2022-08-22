@@ -16,6 +16,7 @@ DRUG = 'DRUG'
 COST = 'COST'
 CLAIM = 'CLAIM'
 PRACTIONER = 'PRACTIONER'
+PLAN = 'PLAN'
 
 
 spark = SparkSession\
@@ -82,29 +83,17 @@ def get_code_system(code_system_version: str, code_system_type: str):
     return to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
 
 
-plan_cache = dict([(row['IMS_PLN_ID'], row) for row in plan_list])
-drug_cache = dict([(row['NDC_CD'], row) for row in drug_list])
-provider_cache = dict([(row['PROVIDER_ID'], row) for row in provider_list])
-problem_cache = dict([(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), Row(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC'])) for row in problem_list])
-proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row["PRC_TYP_CD"]), Row(PRC_SHORT_DESC=row['PRC_SHORT_DESC'])) for row in proc_list])
+plan_cache = dict([(row['IMS_PLN_ID'], row.asDict()) for row in plan_list])
+drug_cache = dict([(row['NDC_CD'], row.asDict()) for row in drug_list])
+provider_cache = dict([(row['PROVIDER_ID'], row.asDict()) for row in provider_list])
+problem_cache = dict([(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC'])) for row in problem_list])
+proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row["PRC_TYP_CD"]), dict(PRC_SHORT_DESC=row['PRC_SHORT_DESC'])) for row in proc_list])
 
-ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache}
+ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache, PLAN: plan_cache}
 broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 
 def ref_lookup(event_type: str, key: str):
     return broadcast_cache.value[event_type][key]
-
-
-ref_lookup(DRUG, '61553045578')
-# broadcast_cache.value['PROCEDURE']['J7659:HCPCS']
-
-# lst_to_dict = lambda row: dict([(row['IMS_PLN_ID'], row) for row in plan_list])
-# lst_to_dict(plan_list)
-
-# plan_cache = dict(map(lst_to_dict, plan_list))
-
-
-
 
 
 ### end of create data frames

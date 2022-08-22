@@ -5,11 +5,15 @@ from common.functions import *
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
 from pymonad.either import *
+from staging_ingest_processor import *
 
 RENDERING = 'RENDERING'
 REFERRING = 'REFERRING'
 # is_record_valid = lambda x: False if (len(x) > 0) else True
 
+
+def ref_lookup(event_type: str, key: str):
+    return broadcast_cache.value[event_type].get(key, {})
 
 def is_record_valid(rec: list):
     if len(rec) > 0:
@@ -68,6 +72,7 @@ def _to_procedure_row(claim_row: Row) -> Row:
     modifiers = [claim_row.PRC1_MODR_CD, claim_row.PRC2_MODR_CD, claim_row.PRC3_MODR_CD, claim_row.PRC4_MODR_CD]
     # modifiers = [{claim_row.PRC1_MODR_CD, claim_row.PRC2_MODR_CD, claim_row.PRC3_MODR_CD, claim_row.PRC4_MODR_CD]
     modifiers_clean = [i for i in modifiers if i is not None]
+    source_desc = ref_lookup(PROCEDURE, f'{proc_code.get("code", None)}:{proc_code.get("code_system", None)}').get('PRC_SHORT_DESC', None)
 
     proc_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
@@ -83,7 +88,8 @@ def _to_procedure_row(claim_row: Row) -> Row:
                    revenue_code_raw=claim_row.CLAIM_HOSP_REV_CD,
                    revenue_code=rev_code.get('code', None),
                    desc=proc_code.get('desc', None),
-                   source_desc=claim_row.PRC_SHORT_DESC,
+                   source_desc=source_desc,
+                   # source_desc=claim_row.PRC_SHORT_DESC,
                    mod_raw=modifiers_clean,
                    mod=modifiers_clean,
                    error=validation_errors,
@@ -117,6 +123,7 @@ def _to_problem_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
+    source_desc = ref_lookup(PROBLEM, f'{diag_code.get("code", None)}:{diag_code.get("code_system", None)}').get('DIAG_SHORT_DESC', None)
 
     diag_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
@@ -130,7 +137,8 @@ def _to_problem_row(claim_row: Row) -> Row:
                    code_system_raw=claim_row.DIAG_VERS_TYP_ID,
                    code_system=diag_code.get('code_system', None),
                    desc=diag_code.get('desc', None),
-                   source_desc=claim_row.DIAG_SHORT_DESC,
+                   source_desc=source_desc,
+                   # source_desc=claim_row.DIAG_SHORT_DESC,
                    is_admitting=False,
                    error=validation_errors,
                    warning=validation_warnings,
@@ -163,6 +171,7 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
+
     diag_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
@@ -205,6 +214,8 @@ def _to_drug_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
+    cached_drug = ref_lookup(DRUG, drug_code.get("code", None))
+
     drug_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
@@ -217,13 +228,20 @@ def _to_drug_row(claim_row: Row) -> Row:
                    code_system_raw=NDC,
                    code_system=drug_code.get('code_system', None),
                    desc=drug_code.get('desc', None),
-                   source_desc=claim_row.MKTED_PROD_NM,
-                   strength_raw=claim_row.STRNT_DESC,
-                   strength=claim_row.STRNT_DESC,
-                   form=claim_row.DOSAGE_FORM_NM,
-                   form_raw=claim_row.DOSAGE_FORM_NM,
-                   classification=claim_row.USC_DESC,
-                   classification_raw=claim_row.USC_DESC,
+                   source_desc=cached_drug.get('MKTED_PROD_NM', None),
+                   # source_desc=claim_row.MKTED_PROD_NM,
+                   strength_raw=cached_drug.get('STRNT_DESC', None),
+                   # strength_raw=claim_row.STRNT_DESC,
+                   strength=cached_drug.get('STRNT_DESC', None),
+                   # strength=claim_row.STRNT_DESC,
+                   form=cached_drug.get('DOSAGE_FORM_NM', None),
+                   # form=claim_row.DOSAGE_FORM_NM,
+                   form_raw=cached_drug.get('DOSAGE_FORM_NM', None),
+                   # form_raw=claim_row.DOSAGE_FORM_NM,
+                   classification=cached_drug.get('USC_DESC', None),
+                   # classification=claim_row.USC_DESC,
+                   classification_raw=cached_drug.get('USC_DESC', None),
+                   # classification_raw=claim_row.USC_DESC,
                    error=validation_errors,
                    warning=validation_warnings,
                    is_valid=valid,
@@ -355,13 +373,20 @@ def _to_claim_row(claim_row: Row) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-
+    cached_plan = ref_lookup(PLAN, claim_row.IMS_PLN_ID)
+    # {'PLAN_ID': '20947', 'IMS_PLN_ID': '735', 'IMS_PLN_NM': 'UHC MED ADV GENERAL (HI)', 'IMS_PAYER_ID': '2429',
+    #  'IMS_PAYER_NM': 'UHC/PACIFICARE/AARP MED D', 'PLANTRACK_ID': '0024290735', 'MODEL_TYP_CD': 'MED ADVG',
+    #  'MODEL_TYP_NM': 'GENERAL MEDICARE D ADVANTAGE', 'IMS_PBM_ADJUDICATING_ID': '65000',
+    #  'IMS_PBM_ADJUDICATING_NM': 'OPTUMRX (PROC UNSPEC)', 'org_type': 'THIRD PARTY CLAIMS AGGREGATOR',
+    #  'plan_status': True}
     claim_stage_row = Row(id=uuid.uuid4().hex[:12],
                            source_consumer_id=claim_row.PATIENT_ID,
                             source_org_oid=claim_row.source_org_oid,
-                            payer_name=claim_row.IMS_PAYER_NM,
+                            payer_name=cached_plan.get('IMS_PAYER_NM', None),
+                            # payer_name=claim_row.IMS_PAYER_NM,
                             payer_id=claim_row.IMS_PLN_ID,
-                            plan_name=claim_row.IMS_PLN_NM,
+                            plan_name=cached_plan.get('IMS_PLN_NM', None),
+                            # plan_name=claim_row.IMS_PLN_NM,
                             plan_id=claim_row.PLAN_ID,
                             claim_identifier=claim_row.CLAIM_ID,
                             service_number=claim_row.SVC_NBR,
@@ -407,19 +432,34 @@ def _to_practitioner_row(claim_row: Row) -> Row:
     providers = []
 
     if claim_row.RENDERING_PROVIDER_ID is not None:
-        source_provider_type_result = validate_provider_type(claim_row.RENDERING_PROVIDER_TYP_ID)
+        cached_provider = ref_lookup(PRACTIONER, claim_row.RENDERING_PROVIDER_ID)
+        source_provider_type_result = validate_provider_type(cached_provider.get('PROVIDER_TYP_ID', None))
+        # source_provider_type_result = validate_provider_type(claim_row.RENDERING_PROVIDER_TYP_ID)
         validation_errors = extract_left(*[source_provider_type_result])
         valid = is_record_valid(validation_errors)
         validation_warnings = []
         warn = False
 
+        # {'PROVIDER_ID': '10151134',
+        #  'PROVIDER_TYP_ID': '1',
+        #  'ORG_NM': None,
+        #  'IMS_RXER_ID': '4596454',
+        #  'LAST_NM': 'NA', 'FIRST_NM': 'CHANGRIM', 'ADDR_LINE1_TXT': '3501 STOCKDALE HWY',
+        #              'ADDR_LINE2_TXT': None, 'CITY_NM': 'BAKERSFIELD', 'ST_CD': 'CA', 'ZIP': '93309',
+        # 'PRI_SPCL_CD': 'GPM',
+        #  'PRI_SPCL_DESC': 'GENERAL PREVENTIVE MEDICINE', 'ME_NBR': '0051808117',
+        # 'NPI': '1427290543'}
         rendering_provider_row = Row(id=uuid.uuid4().hex[:12],
-                                     npi=claim_row.RENDERING_NPI,
+                                     npi=cached_provider.get('NPI', None),
+                                     # npi=claim_row.RENDERING_NPI,
                                     source_org_oid=claim_row.source_org_oid,
-                                    first_name=claim_row.RENDERING_FIRST_NM,
-                                    last_name=claim_row.RENDERING_LAST_NM,
+                                    first_name=cached_provider.get('FIRST_NM', None),
+                                    # first_name=claim_row.RENDERING_FIRST_NM,
+                                    last_name=cached_provider.get('FIRST_NM', None),
+                                    # last_name=claim_row.RENDERING_LAST_NM,
                                     source_provider_id=claim_row.RENDERING_PROVIDER_ID,
-                                    provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
+                                    provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
+                                    # provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
                                     provider_type=source_provider_type_result.value,
                                     role=RENDERING,
                                     claim_identifier=claim_row.CLAIM_ID,
@@ -434,29 +474,35 @@ def _to_practitioner_row(claim_row: Row) -> Row:
         providers.append(rendering_provider_row)
 
     if claim_row.REFERRING_PROVIDER_ID is not None:
-        source_provider_type_result = validate_provider_type(claim_row.REFERRING_PROVIDER_TYP_ID)
+        cached_provider = ref_lookup(PRACTIONER, claim_row.REFERRING_PROVIDER_ID)
+        source_provider_type_result = validate_provider_type(cached_provider.get('PROVIDER_TYP_ID', None))
+        # source_provider_type_result = validate_provider_type(claim_row.REFERRING_PROVIDER_TYP_ID)
         validation_errors = extract_left(*[source_provider_type_result])
         valid = is_record_valid(validation_errors)
         validation_warnings = []
         warn = False
         ref_provider_row = Row(id=uuid.uuid4().hex[:12],
-                               npi=claim_row.REFERRING_NPI,
-                                source_org_oid=claim_row.source_org_oid,
-                                first_name=claim_row.REFERRING_FIRST_NM,
-                                last_name=claim_row.REFERRING_LAST_NM,
-                                source_provider_id=claim_row.REFERRING_PROVIDER_ID,
-                                provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
-                                provider_type=source_provider_type_result.value,
-                                role=REFERRING,
-                                claim_identifier=claim_row.CLAIM_ID,
-                                service_number=claim_row.SVC_NBR,
-                                active=True,
-                                error=validation_errors,
-                                warning=validation_warnings,
-                                is_valid=valid,
-                                has_warnings=warn,
-                                batch_id=claim_row.batch_id,
-                                date_created=claim_row.date_created)
+                                     npi=cached_provider.get('NPI', None),
+                                     # npi=claim_row.RENDERING_NPI,
+                                    source_org_oid=claim_row.source_org_oid,
+                                    first_name=cached_provider.get('FIRST_NM', None),
+                                    # first_name=claim_row.RENDERING_FIRST_NM,
+                                    last_name=cached_provider.get('FIRST_NM', None),
+                                    # last_name=claim_row.RENDERING_LAST_NM,
+                                    source_provider_id=claim_row.RENDERING_PROVIDER_ID,
+                                    provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
+                                    # provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
+                                    provider_type=source_provider_type_result.value,
+                                    role=RENDERING,
+                                    claim_identifier=claim_row.CLAIM_ID,
+                                    service_number=claim_row.SVC_NBR,
+                                    active=True,
+                                    error=validation_errors,
+                                    warning=validation_warnings,
+                                    is_valid=valid,
+                                    has_warnings=warn,
+                                    batch_id=claim_row.batch_id,
+                                    date_created=claim_row.date_created)
         providers.append(ref_provider_row)
 
     return providers
