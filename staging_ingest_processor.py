@@ -58,19 +58,19 @@ date_created = datetime.now()
 org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id, date_created)]
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
-raw_plan_df = load_plan(spark, plan_path, raw_plan_schema).repartition('PLAN_ID')
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID')
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).repartition('PATIENT_ID_CLAIM').limit(1000000)
-raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema).repartition('PRC_CD', 'PRC_VERS_TYP_ID')
-raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC1_MODR_CD')
-raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC2_MODR_CD')
-raw_proc_mod_3_df = load_procedure_modifier3(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC3_MODR_CD')
-raw_proc_mod_4_df = load_procedure_modifier4(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC4_MODR_CD')
-raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema).repartition('DIAG_CD', 'DIAG_VERS_TYP_ID')
-raw_drug_df = load_drug(spark, drug_path, raw_drug_schema).repartition('NDC_CD')
+raw_plan_df = load_plan(spark, plan_path, raw_plan_schema) #.repartition('PLAN_ID')
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID').limit(1000)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).repartition('PATIENT_ID_CLAIM').limit(1000)
+raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)#.repartition('PRC_CD', 'PRC_VERS_TYP_ID')
+# raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC1_MODR_CD')
+# raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC2_MODR_CD')
+# raw_proc_mod_3_df = load_procedure_modifier3(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC3_MODR_CD')
+# raw_proc_mod_4_df = load_procedure_modifier4(spark, proc_modifier_path, raw_procedure_modifier_schema).repartition('PRC4_MODR_CD')
+raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)#.repartition('DIAG_CD', 'DIAG_VERS_TYP_ID')
+raw_drug_df = load_drug(spark, drug_path, raw_drug_schema)#.repartition('NDC_CD')
 provider_raw = load_provider(spark, provider_path, raw_provider_schema)
-raw_rendering_provider_df = load_rendering_provider(provider_raw).repartition('RENDERING_PROVIDER_ID')
-raw_referring_provider_df = load_referring_provider(provider_raw).repartition('REFERRING_PROVIDER_ID')
+# raw_rendering_provider_df = load_rendering_provider(provider_raw).repartition('RENDERING_PROVIDER_ID')
+# raw_referring_provider_df = load_referring_provider(provider_raw).repartition('REFERRING_PROVIDER_ID')
 
 
 plan_list = raw_plan_df.collect()
@@ -78,6 +78,23 @@ proc_list = raw_proc_df.collect()
 drug_list = raw_drug_df.collect()
 problem_list = raw_diag_df.filter(raw_diag_df.DIAG_VERS_TYP_ID != -1).collect()
 provider_list = provider_raw.collect()
+
+# from iqvia.common.functions import to_standard_code_system
+
+def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -> Either:
+    if version_id == '2':
+        return Right('ICD10')
+    elif version_id == '1':
+        return Right('ICD9')
+    elif version_id == '-1' and type_cd=='C':
+        return Right('CPT')
+    elif version_id == '-1' and type_cd=='H':
+        return Right('HCPCS')
+    else:
+        error = {'error': f'Invalid version_id/type_cd combination',
+                 'source_column_value': f'{version_id}:{type_cd}',
+                 'source_column_name': source_column_name}
+        return Left(error)
 
 def get_code_system(code_system_version: str, code_system_type: str):
     return to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
@@ -87,14 +104,15 @@ plan_cache = dict([(row['IMS_PLN_ID'], row.asDict()) for row in plan_list])
 drug_cache = dict([(row['NDC_CD'], row.asDict()) for row in drug_list])
 provider_cache = dict([(row['PROVIDER_ID'], row.asDict()) for row in provider_list])
 problem_cache = dict([(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC'])) for row in problem_list])
-proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row["PRC_TYP_CD"]), dict(PRC_SHORT_DESC=row['PRC_SHORT_DESC'])) for row in proc_list])
+proc_cache = dict([(row["PRC_CD"] + ':' + row["PRC_VERS_TYP_ID"], row.asDict()) for row in proc_list])
+# proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row["PRC_TYP_CD"]), dict(PRC_SHORT_DESC=row['PRC_SHORT_DESC'])) for row in proc_list])
 
 ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache, PLAN: plan_cache}
+print('------------------------>>>>>>> broadcasting reference data')
 broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 
 def ref_lookup(event_type: str, key: str):
-    return broadcast_cache.value[event_type][key]
-
+    return broadcast_cache.value[event_type].get(key, {})
 
 ### end of create data frames
 
@@ -116,21 +134,6 @@ currated_patient_df.unpersist()
 print('------------------------>>>>>>> saved patient')
 ### create clinical events
 patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
-    .join(raw_diag_df, on=[raw_claim_df.DIAG_CD == raw_diag_df.DIAG_CD, raw_claim_df.DIAG_VERS_TYP_ID == raw_diag_df.DIAG_VERS_TYP_ID],
-          how="left_outer") \
-    .join(raw_proc_df, on=[raw_claim_df.PRC_CD == raw_proc_df.PRC_CD, raw_claim_df.PRC_VERS_TYP_ID == raw_proc_df.PRC_VERS_TYP_ID],
-          how="left_outer") \
-    .join(raw_proc_mod_1_df, on=[raw_claim_df.PRC1_MODR_CD == raw_proc_mod_1_df.PRC1_MODR_CD], how="left_outer") \
-    .join(raw_proc_mod_2_df, on=[raw_claim_df.PRC2_MODR_CD == raw_proc_mod_2_df.PRC2_MODR_CD], how="left_outer") \
-    .join(raw_proc_mod_3_df, on=[raw_claim_df.PRC3_MODR_CD == raw_proc_mod_3_df.PRC3_MODR_CD], how="left_outer") \
-    .join(raw_proc_mod_4_df, on=[raw_claim_df.PRC4_MODR_CD == raw_proc_mod_4_df.PRC4_MODR_CD], how="left_outer") \
-    .join(raw_drug_df, on=[raw_claim_df.NDC_CD == raw_drug_df.NDC_CD], how="left_outer") \
-    .join(raw_rendering_provider_df,
-          on=[raw_claim_df.RENDERING_PROVIDER_ID == raw_rendering_provider_df.RENDERING_PROVIDER_ID], how="left_outer") \
-    .join(raw_referring_provider_df,
-          on=[raw_claim_df.REFERRING_PROVIDER_ID == raw_referring_provider_df.REFERRING_PROVIDER_ID], how="left_outer") \
-    .join(raw_plan_df,
-          on=[raw_plan_df.PLAN_ID == raw_claim_df.PLAN_ID_CLAIM], how="left_outer") \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created))\
     .rdd\
@@ -139,7 +142,7 @@ patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATI
 # raw_claim_df.repartition(col('PATIENT_ID_CLAIM')).sortWithinPartitions(col('PATIENT_ID_CLAIM')).show(1)
 
 ### create procedure
-procedure_rdd = to_procedure(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+procedure_rdd = to_procedure(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
 save_procedure_modifiers(procedure_rdd, generate_output_path('proceduremodifier'))
 
@@ -149,7 +152,7 @@ currated_df.unpersist(False)
 procedure_rdd.unpersist(False)
 print('------------------------>>>>>>> saved procs')
 ### problems
-problem_rdd = to_problem(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+problem_rdd = to_problem(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(problem_rdd, PROBLEM, generate_output_path('error'))
 admitting_problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(admitting_problem_rdd, PROBLEM, generate_output_path('error'))

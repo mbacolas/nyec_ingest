@@ -5,15 +5,22 @@ from common.functions import *
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
 from pymonad.either import *
-from staging_ingest_processor import *
+# from staging_ingest_processor import ref_lookup
 
 RENDERING = 'RENDERING'
 REFERRING = 'REFERRING'
-# is_record_valid = lambda x: False if (len(x) > 0) else True
 
+PATIENT = 'PATIENT'
+PROCEDURE = 'PROCEDURE'
+PROBLEM = 'PROBLEM'
+DRUG = 'DRUG'
+COST = 'COST'
+CLAIM = 'CLAIM'
+PRACTIONER = 'PRACTIONER'
+PLAN = 'PLAN'
 
-def ref_lookup(event_type: str, key: str):
-    return broadcast_cache.value[event_type].get(key, {})
+# def ref_lookup(event_type: str, key: str):
+#     return broadcast_cache.value[event_type].get(key, {})
 
 def is_record_valid(rec: list):
     if len(rec) > 0:
@@ -37,6 +44,8 @@ def extract_code(result: Either) -> dict:
         return {}
 
 
+
+# from iqvia.common.functions import *
 def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -> Either:
     if version_id == '2':
         return Right('ICD10')
@@ -53,10 +62,14 @@ def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -
         return Left(error)
 
 
-def _to_procedure_row(claim_row: Row) -> Row:
+def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
-    all_code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, claim_row.PRC_TYP_CD, 'PRC_VERS_TYP_ID:PRC_TYP_CD')
+
+    cached_proc = ref_lookup(PROCEDURE, claim_row.PRC_CD + ':' + claim_row.PRC_VERS_TYP_ID)
+    code_system = cached_proc.get('PRC_TYP_CD', None)
+    all_code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, code_system, 'PRC_VERS_TYP_ID:PRC_TYP_CD')
+
     proc_code_result = get_code(claim_row.PRC_CD, all_code_system_result.value, 'PRC_CD')
     rev_code_result = get_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
     proc_code=extract_code(proc_code_result)
@@ -72,7 +85,6 @@ def _to_procedure_row(claim_row: Row) -> Row:
     modifiers = [claim_row.PRC1_MODR_CD, claim_row.PRC2_MODR_CD, claim_row.PRC3_MODR_CD, claim_row.PRC4_MODR_CD]
     # modifiers = [{claim_row.PRC1_MODR_CD, claim_row.PRC2_MODR_CD, claim_row.PRC3_MODR_CD, claim_row.PRC4_MODR_CD]
     modifiers_clean = [i for i in modifiers if i is not None]
-    source_desc = ref_lookup(PROCEDURE, f'{proc_code.get("code", None)}:{proc_code.get("code_system", None)}').get('PRC_SHORT_DESC', None)
 
     proc_row = Row(id=uuid.uuid4().hex[:12],
                    source_consumer_id=claim_row.PATIENT_ID,
@@ -83,12 +95,13 @@ def _to_procedure_row(claim_row: Row) -> Row:
                    to_date=to_date_result.value,
                    code_raw=claim_row.PRC_CD,
                    code=proc_code.get('code', None),
-                   code_system_raw=claim_row.PRC_TYP_CD,
+                   code_system_raw=code_system,
+                   # code_system_raw=claim_row.PRC_TYP_CD,
                    code_system=proc_code.get('code_system', None),
                    revenue_code_raw=claim_row.CLAIM_HOSP_REV_CD,
                    revenue_code=rev_code.get('code', None),
                    desc=proc_code.get('desc', None),
-                   source_desc=source_desc,
+                   source_desc=cached_proc.get('PRC_SHORT_DESC', None),
                    # source_desc=claim_row.PRC_SHORT_DESC,
                    mod_raw=modifiers_clean,
                    mod=modifiers_clean,
@@ -101,15 +114,15 @@ def _to_procedure_row(claim_row: Row) -> Row:
     return proc_row
 
 
-def to_procedure(claim_rdd: RDD) -> RDD:
+def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
-                    .map(lambda r: _to_procedure_row(r))\
+                    .map(lambda r: _to_procedure_row(r, ref_lookup))\
                     .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
                     .reduceByKey((lambda a,b: a))\
                     .map(lambda r: r[1])
 
 
-def _to_problem_row(claim_row: Row) -> Row:
+def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
     all_code_system_result = to_standard_code_system(claim_row.DIAG_VERS_TYP_ID, claim_row.DIAG_CD,
@@ -150,9 +163,9 @@ def _to_problem_row(claim_row: Row) -> Row:
     return diag_row
 
 
-def to_problem(claim_rdd: RDD) -> RDD:
+def to_problem(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
-                    .map(lambda r: _to_problem_row(r))\
+                    .map(lambda r: _to_problem_row(r, ref_lookup))\
                     .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
@@ -203,7 +216,7 @@ def to_admitting_diagnosis(claim_rdd: RDD) -> RDD:
                     .map(lambda r: r[1])
 
 
-def _to_drug_row(claim_row: Row) -> Row:
+def _to_drug_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
     drug_code_result = get_code(claim_row.NDC_CD, 'NDC_CD', 'NDC_CD')
@@ -251,10 +264,10 @@ def _to_drug_row(claim_row: Row) -> Row:
     return drug_row
 
 
-def to_drug(claim_rdd: RDD) -> RDD:
+def to_drug(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd \
         .filter(lambda r: r.NDC_CD is not None) \
-        .map(lambda r: _to_drug_row(r))\
+        .map(lambda r: _to_drug_row(r, ref_lookup))\
         .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
         .reduceByKey((lambda a, b: a))\
         .map(lambda r: r[1])
@@ -356,7 +369,7 @@ def to_cost(claim_row_rdd: RDD) -> RDD:
                     .map(lambda r: r[1])
 
 
-def _to_claim_row(claim_row: Row) -> Row:
+def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     source_claim_type = to_claim_type(claim_row.CLAIM_TYP_CD)
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', is_requied=False)
@@ -421,14 +434,14 @@ def _to_claim_row(claim_row: Row) -> Row:
     return claim_stage_row
 
 
-def to_claim(claim_raw: RDD) -> RDD:
-    return claim_raw.map(lambda r: _to_claim_row(r))\
+def to_claim(claim_raw: RDD, ref_lookup) -> RDD:
+    return claim_raw.map(lambda r: _to_claim_row(r, ref_lookup))\
                     .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier)) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
 
 
-def _to_practitioner_row(claim_row: Row) -> Row:
+def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
     providers = []
 
     if claim_row.RENDERING_PROVIDER_ID is not None:
@@ -508,8 +521,8 @@ def _to_practitioner_row(claim_row: Row) -> Row:
     return providers
 
 
-def to_practitioner(claim_rdd: RDD) -> RDD:
-    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r))
+def to_practitioner(claim_rdd: RDD, ref_lookup) -> RDD:
+    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r, ref_lookup))
                     # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
 
 
