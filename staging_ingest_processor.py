@@ -71,10 +71,41 @@ provider_raw = load_provider(spark, provider_path, raw_provider_schema)
 raw_rendering_provider_df = load_rendering_provider(provider_raw).repartition('RENDERING_PROVIDER_ID')
 raw_referring_provider_df = load_referring_provider(provider_raw).repartition('REFERRING_PROVIDER_ID')
 
-raw_plan_df.collect()
-States = {"DL":"Delhi", "RJ":"Rajasthan", "KA":"Karnataka"}
 
-broadcast_states = spark.sparkContext.broadcast(States)
+plan_list = raw_plan_df.collect()
+proc_list = raw_proc_df.collect()
+drug_list = raw_drug_df.collect()
+problem_list = raw_diag_df.filter(raw_diag_df.DIAG_VERS_TYP_ID != -1).collect()
+provider_list = provider_raw.collect()
+
+def get_code_system(code_system_version: str, code_system_type: str):
+    return to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
+
+
+plan_cache = dict([(row['IMS_PLN_ID'], row) for row in plan_list])
+drug_cache = dict([(row['NDC_CD'], row) for row in drug_list])
+provider_cache = dict([(row['PROVIDER_ID'], row) for row in provider_list])
+problem_cache = dict([(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), Row(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC'])) for row in problem_list])
+proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row["PRC_TYP_CD"]), Row(PRC_SHORT_DESC=row['PRC_SHORT_DESC'])) for row in proc_list])
+
+ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache}
+broadcast_cache = spark.sparkContext.broadcast(ref_cache)
+
+def ref_lookup(event_type: str, key: str):
+    return broadcast_cache.value[event_type][key]
+
+
+ref_lookup(DRUG, '61553045578')
+# broadcast_cache.value['PROCEDURE']['J7659:HCPCS']
+
+# lst_to_dict = lambda row: dict([(row['IMS_PLN_ID'], row) for row in plan_list])
+# lst_to_dict(plan_list)
+
+# plan_cache = dict(map(lst_to_dict, plan_list))
+
+
+
+
 
 ### end of create data frames
 
