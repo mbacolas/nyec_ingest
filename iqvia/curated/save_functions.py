@@ -154,7 +154,8 @@ def save_cost(currated_cost_df: DataFrame, output_path: str):
                 col('claim_identifier'),
                 col('service_number'),
                 col('paid_amount'),
-                col('batch_id')) \
+                col('batch_id'),
+                col('date_created')) \
         .repartition(col('source_org_oid'), col('source_consumer_id'))\
         .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id'), col('claim_identifier'),
                               col('service_number'))\

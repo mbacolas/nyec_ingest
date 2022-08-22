@@ -81,7 +81,7 @@ def is_included(obj: str, source_column_name: str, enum: list) -> Either:
 
 
 def is_number(obj: str, source_column_name: str) -> Either:
-    if obj is not None and obj.isnumeric():
+    if obj is not None and obj.replace('.', '', 1).isnumeric():
         return Right(Decimal(obj))
     else:
         error = {'source_column_name': source_column_name,

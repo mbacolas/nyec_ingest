@@ -59,7 +59,7 @@ org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
 raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema) #.limit(100)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_proc_mod_1_df = load_procedure_modifier1(spark, proc_modifier_path, raw_procedure_modifier_schema)
 raw_proc_mod_2_df = load_procedure_modifier2(spark, proc_modifier_path, raw_procedure_modifier_schema)
@@ -186,8 +186,8 @@ currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.
 
 practitioner_role_df = to_practitioner_role_row(currated_df)
 
-save_provider_role(currated_df, generate_output_path('provider'))
-save_provider(practitioner_role_df, generate_output_path('provider_role'))
+save_provider_role(currated_df, generate_output_path('provider_role'))
+save_provider(practitioner_role_df, generate_output_path('provider'))
 
 patient_claims_raw_rdd.unpersist(False)
 currated_df.unpersist(False)
