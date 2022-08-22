@@ -47,9 +47,9 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Slave nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
-                "InstanceType": "r5.4xlarge",
-                # "InstanceType": "m5.xlarge",
-                "InstanceCount": 1
+                # "InstanceType": "r5.4xlarge",
+                "InstanceType": "m5.xlarge",
+                "InstanceCount": 6
             }
         ],
         "Ec2SubnetId": subnetID['Parameter']['Value'],
@@ -187,10 +187,13 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      # '--conf',
-                     # f'spark.executor.memory=16g',
-
+                     # f'spark.executor.memory=14g',
+                     #
                      # '--conf',
                      # f'spark.executor.cores=4',
+                     #
+                     # '--conf',
+                     # f'num-executors=6',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
