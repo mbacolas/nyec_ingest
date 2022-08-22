@@ -386,7 +386,7 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    cached_plan = ref_lookup(PLAN, claim_row.IMS_PLN_ID)
+    cached_plan = ref_lookup(PLAN, claim_row.PLAN_ID)
     # {'PLAN_ID': '20947', 'IMS_PLN_ID': '735', 'IMS_PLN_NM': 'UHC MED ADV GENERAL (HI)', 'IMS_PAYER_ID': '2429',
     #  'IMS_PAYER_NM': 'UHC/PACIFICARE/AARP MED D', 'PLANTRACK_ID': '0024290735', 'MODEL_TYP_CD': 'MED ADVG',
     #  'MODEL_TYP_NM': 'GENERAL MEDICARE D ADVANTAGE', 'IMS_PBM_ADJUDICATING_ID': '65000',
@@ -397,7 +397,8 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
                             source_org_oid=claim_row.source_org_oid,
                             payer_name=cached_plan.get('IMS_PAYER_NM', None),
                             # payer_name=claim_row.IMS_PAYER_NM,
-                            payer_id=claim_row.IMS_PLN_ID,
+                            payer_id=cached_plan.get('IMS_PLN_ID', None),
+                            # payer_id=claim_row.IMS_PLN_ID,
                             plan_name=cached_plan.get('IMS_PLN_NM', None),
                             # plan_name=claim_row.IMS_PLN_NM,
                             plan_id=claim_row.PLAN_ID,
