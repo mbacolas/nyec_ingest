@@ -59,8 +59,8 @@ org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREG
 org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID')
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).repartition('PATIENT_ID_CLAIM')
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID').sortWithinPartitions('PATIENT_ID').persist(StorageLevel.MEMORY_AND_DISK)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(100 * 1000).repartition('PATIENT_ID_CLAIM').sortWithinPartitions('PATIENT_ID_CLAIM').persist(StorageLevel.MEMORY_AND_DISK)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
 raw_drug_df = load_drug(spark, drug_path, raw_drug_schema)
@@ -104,17 +104,6 @@ broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 def ref_lookup(event_type: str, key: str):
     return broadcast_cache.value[event_type].get(key, {})
 
-# plan_list = None
-# proc_list = None
-# drug_list = None
-# problem_list = None
-# provider_list = None
-# plan_cache = None
-# drug_cache = None
-# provider_cache = None
-# problem_cache = None
-# proc_cache = None
-# ref_cache = None
 ### end of create data frames
 
 ### create stage patient DF
@@ -134,6 +123,8 @@ save_errors(currated_patient_rdd, PATIENT, generate_output_path('error'))
 currated_patient_rdd.unpersist()
 currated_patient_df.unpersist()
 print('------------------------>>>>>>> saved patient <<<--- ')
+raw_claim_df.first()
+print('------------------------>>>>>>> raw_claim_df.first() <<<--- ')
 ### create clinical events
 patient_claims_raw_df = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
     .withColumn('batch_id', lit(batch_id)) \
@@ -145,6 +136,9 @@ print('------------------------>>>>>>> created patient_claims_raw_df')
 patient_claims_raw_rdd = patient_claims_raw_df.rdd.persist(StorageLevel.MEMORY_AND_DISK)
 patient_claims_raw_rdd.first()
 patient_claims_raw_df.unpersist()
+raw_patient_df.unpersist()
+raw_claim_df.unpersist()
+
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
 # raw_claim_df.repartition(col('PATIENT_ID_CLAIM')).sortWithinPartitions(col('PATIENT_ID_CLAIM')).show(1)
 
