@@ -174,6 +174,7 @@ error_schema = StructType([
     StructField("batch_id", StringType()),
     StructField("type", StringType()),
     StructField("row_errors", StringType()),
+    StructField("row_warnings", StringType()),
     StructField("row_value", StringType()),
     StructField("date_created", DateType())
 ])

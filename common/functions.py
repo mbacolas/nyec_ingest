@@ -12,11 +12,11 @@ all_codes = {}
 all_code_systems = {'ICD10'}
 NDC = 'NDC'
 
-def str_to_date(date_raw: str, source_column_name: str, is_requied=True, date_format="%Y%m%d") -> Either:
+def str_to_date(date_raw: str, source_column_name: str, is_required=True, date_format="%Y%m%d") -> Either:
     try:
-        if not is_requied and date_raw is None:
+        if not is_required and date_raw is None:
             return Right(None)
-        elif is_requied and date_raw is None:
+        elif is_required and date_raw is None:
             error = {'error': 'NULL value for required field', 'raw_value': date_raw, 'date_format': date_format,
                      'source_column': source_column_name}
             return Left(error)
@@ -31,7 +31,7 @@ def str_to_date(date_raw: str, source_column_name: str, is_requied=True, date_fo
 #TODO: REMOVE once ref data is loaded
 def tmp_function(code_system_raw: str, code_raw:str):
     search_key = f'{code_raw}:{code_system_raw}'
-    if code_system_raw is None or code_raw is None:
+    if code_system_raw is None or (code_raw is None or code_raw == '-1'):
         return None
     else:
         return {'code': search_key.split(':')[0], 'code_system': search_key.split(':')[1], 'desc': 'UNKNOWN'}
@@ -43,7 +43,7 @@ def get_code(code_raw: str, code_system_raw: str, source_column_name: str) -> Ei
     if code_dict is not None:
         return Right(code_dict)
     else:
-        error = {'error': f'CODE_SYSTEM:CODE {code_system_raw}:{code_raw} NOT FOUND',
+        error = {'error': f'CODE_SYSTEM:CODE {code_system_raw}:{code_raw} NOT FOUND or is INVALID',
                  'source_column_value': f'{code_system_raw}:{code_raw}',
                  'source_column_name': source_column_name}
         return Left(json.dumps(error))

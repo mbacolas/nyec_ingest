@@ -47,9 +47,11 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Slave nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
+                "InstanceType": "r5.xlarge",
                 # "InstanceType": "r5.4xlarge",
-                "InstanceType": "m5.xlarge",
-                "InstanceCount": 18
+                # "InstanceType": "m5.xlarge",
+                # "InstanceCount": 18
+                "InstanceCount": 20
             }
         ],
         "Ec2SubnetId": subnetID['Parameter']['Value'],
@@ -131,6 +133,15 @@ TO_PROCESSED_SPARK_STEPS = [
 
                     '--conf',
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
+
+                     '--conf',
+                     f'spark.executor.memory=30g',
+
+                     '--conf',
+                     f'spark.executor.cores=4',
+
+                     # '--conf',
+                     # f'num-executors=6',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
@@ -242,21 +253,21 @@ create_emr_cluster = EmrCreateJobFlowOperator(
     dag=emr_dag
 )
 
-# trigger_processed_emr_job = EmrAddStepsOperator(
-#     task_id='trigger_processed_emr_job',
-#     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
-#     aws_conn_id='aws_default',
-#     steps=TO_PROCESSED_SPARK_STEPS,
-#     dag=emr_dag
-# )
-
-trigger_curated_emr_job = EmrAddStepsOperator(
-    task_id='trigger_curated_emr_job',
+trigger_processed_emr_job = EmrAddStepsOperator(
+    task_id='trigger_processed_emr_job',
     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
-    steps=TO_CURATED_SPARK_STEPS,
+    steps=TO_PROCESSED_SPARK_STEPS,
     dag=emr_dag
 )
+
+# trigger_curated_emr_job = EmrAddStepsOperator(
+#     task_id='trigger_curated_emr_job',
+#     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+#     aws_conn_id='aws_default',
+#     steps=TO_CURATED_SPARK_STEPS,
+#     dag=emr_dag
+# )
 
 # cluster_remover = EmrTerminateJobFlowOperator(
 #     task_id='remove_cluster',
@@ -300,6 +311,6 @@ trigger_curated_emr_job = EmrAddStepsOperator(
 #     task_id='transfer_s3_to_redshift',
 # )
 
-# create_emr_cluster >> trigger_processed_emr_job
-create_emr_cluster >> trigger_curated_emr_job
+create_emr_cluster >> trigger_processed_emr_job
+# create_emr_cluster >> trigger_curated_emr_job
 # create_processed_emr_cluster >> create_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]

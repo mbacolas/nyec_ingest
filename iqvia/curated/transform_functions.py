@@ -390,14 +390,18 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
-    validation_errors = extract_left(*[source_claim_type,
-                                       start_date_result,
-                                       facility_type_cd_result,
-                                       admission_source_cd_result,
-                                       admission_type_cd_result])
+    validation_errors = extract_left(*[start_date_result])
+
+    if admission_date_result.value is not None:
+        validation_warnings = extract_left(*[source_claim_type,
+                                           facility_type_cd_result,
+                                           admission_source_cd_result,
+                                           admission_type_cd_result])
+    else:
+        validation_warnings = extract_left(*[source_claim_type])
     valid = is_record_valid(validation_errors)
-    validation_warnings = []
-    warn = False
+    warn = is_record_valid(validation_warnings)
+
     cached_plan = ref_lookup(PLAN, claim_row.PLAN_ID)
     # {'PLAN_ID': '20947', 'IMS_PLN_ID': '735', 'IMS_PLN_NM': 'UHC MED ADV GENERAL (HI)', 'IMS_PAYER_ID': '2429',
     #  'IMS_PAYER_NM': 'UHC/PACIFICARE/AARP MED D', 'PLANTRACK_ID': '0024290735', 'MODEL_TYP_CD': 'MED ADVG',

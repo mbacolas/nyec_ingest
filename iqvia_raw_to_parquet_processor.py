@@ -31,6 +31,8 @@ def generate_output_path(data_set_name: str) -> str:
 
 
 load_df(spark, plan_load_path, raw_plan_schema, file_delimiter=file_parsing_delimiter) \
+    .repartition(col('PLAN_ID')) \
+    .sortWithinPartitions(col('PLAN_ID')) \
     .write\
     .parquet(generate_output_path('plan'), mode='overwrite', compression='snappy')
 # .repartition(col('PLAN_ID')) \
@@ -38,42 +40,39 @@ load_df(spark, plan_load_path, raw_plan_schema, file_delimiter=file_parsing_deli
 
 print('------------------------>>>>>>> saved plan')
 load_df(spark, patient_load_path, raw_patient_schema, file_delimiter=file_parsing_delimiter)\
+    .repartition(col('PATIENT_ID'))\
+    .sortWithinPartitions(col('PATIENT_ID'))\
     .write.parquet(generate_output_path('patient'), mode='overwrite', compression='snappy')
-# .repartition(col('PATIENT_ID')) \
-#     .sortWithinPartitions(col('PATIENT_ID')) \
-
 print('------------------------>>>>>>> saved patient')
 load_df(spark, claim_load_path, raw_claim_schema, file_delimiter=file_parsing_delimiter) \
+    .repartition(col('PATIENT_ID')) \
+    .sortWithinPartitions(col('PATIENT_ID'), col('CLAIM_ID'), col('SVC_NBR')) \
     .write.parquet(generate_output_path('factdx'), mode='overwrite', compression='snappy')
-
-# .repartition(col('PATIENT_ID')) \
-#     .sortWithinPartitions(col('PATIENT_ID'), col('CLAIM_ID'), col('SVC_NBR')) \
 print('------------------------>>>>>>> saved claim')
-load_df(spark, procedure_load_path, raw_procedure_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, procedure_load_path, raw_procedure_schema, file_delimiter=file_parsing_delimiter)\
+    .repartition(col('PRC_CD'))\
+    .sortWithinPartitions(col('PRC_CD'))\
     .write.parquet(generate_output_path('procedure'), mode='overwrite', compression='snappy')
-    # .repartition(col('PRC_CD'))\
-    # .sortWithinPartitions(col('PRC_CD'))\
-
 print('------------------------>>>>>>> saved proc')
 load_df(spark, proc_modifier_load_path, raw_procedure_modifier_schema, file_delimiter=file_parsing_delimiter) \
+    .repartition(col('PRC_MODR_CD')) \
+    .sortWithinPartitions(col('PRC_MODR_CD')) \
     .write.parquet(generate_output_path('proceduremodifier'), mode='overwrite', compression='snappy')
-    # .repartition(col('PRC_MODR_CD')) \
-    # .sortWithinPartitions(col('PRC_MODR_CD')) \
 print('------------------------>>>>>>> saved proc mod')
 load_df(spark, diagnosis_load_path, raw_diag_schema, file_delimiter=file_parsing_delimiter) \
+    .repartition(col('DIAG_CD')) \
+    .sortWithinPartitions(col('DIAG_CD')) \
     .write.parquet(generate_output_path('diagnosis'), mode='overwrite', compression='snappy')
-    # .repartition(col('DIAG_CD')) \
-    # .sortWithinPartitions(col('DIAG_CD')) \
 print('------------------------>>>>>>> saved diag')
 load_df(spark, drug_load_path, raw_drug_schema, file_delimiter=file_parsing_delimiter) \
+    .repartition(col('NDC_CD')) \
+    .sortWithinPartitions(col('NDC_CD')) \
     .write.parquet(generate_output_path('product'), mode='overwrite', compression='snappy')
-    # .repartition(col('NDC_CD')) \
-    # .sortWithinPartitions(col('NDC_CD')) \
 print('------------------------>>>>>>> saved drug')
 load_df(spark, provider_load_path, raw_provider_schema, file_delimiter=file_parsing_delimiter) \
+    .repartition(col('PROVIDER_ID')) \
+    .sortWithinPartitions(col('PROVIDER_ID')) \
     .write.parquet(generate_output_path('provider'), mode='overwrite', compression='snappy')
-    # .repartition(col('PROVIDER_ID')) \
-    # .sortWithinPartitions(col('PROVIDER_ID')) \
 print('------------------------>>>>>>> done')
 # load_df(spark, pro_provider_load_path, raw_pro_provider_schema, file_delimiter=file_parsing_delimiter) \
 #     .sortWithinPartitions(col('source_provider_id')) \
