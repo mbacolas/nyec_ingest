@@ -30,7 +30,7 @@ def str_to_date(date_raw: str, source_column_name: str, is_requied=True, date_fo
 
 #TODO: REMOVE once ref data is loaded
 def tmp_function(code_system_raw: str, code_raw:str):
-    search_key = f'{code_system_raw}:{code_raw}'
+    search_key = f'{code_raw}:{code_system_raw}'
     if code_system_raw is None or code_raw is None:
         return None
     else:

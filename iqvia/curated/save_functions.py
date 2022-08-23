@@ -58,7 +58,8 @@ def save_patient(currated_patient_df: DataFrame, output_path: str):
                 col('active'),
                 col('dob'),
                 col('gender'),
-                col('batch_id'))\
+                col('batch_id'),
+                col('date_created'))\
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'))\
         .write\
@@ -79,7 +80,8 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('revenue_code'),
                 col('desc'),
                 col('source_desc'),
-                col('batch_id')) \
+                col('batch_id'),
+                col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('start_date'), col('code_system'),
                               col('code'))\
@@ -104,7 +106,8 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
                                 .sortWithinPartitions(col('source_consumer_id'),
                                                       col('start_date'),
                                                       col('code_system'),
-                                                      col('code')) \
+                                                      col('code'),
+                                                      col('date_created')) \
                                 .write.parquet(output_path, mode='overwrite')
 
 def save_problem(currated_problem_df: DataFrame, output_path: str):
@@ -119,7 +122,8 @@ def save_problem(currated_problem_df: DataFrame, output_path: str):
                 col('desc'),
                 col('source_desc'),
                 col('is_admitting'),
-                col('batch_id')) \
+                col('batch_id',
+                col('date_created'))) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('start_date'), col('code_system'), col('code'))\
         .write.parquet(output_path, mode='overwrite')
@@ -139,7 +143,8 @@ def save_drug(currated_drug_df: DataFrame, output_path: str):
                 col("strength"),
                 col("form"),
                 col("classification"),
-                col('batch_id')) \
+                col('batch_id'),
+                col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('start_date'), col('code_system'), col('code'))\
         .write.parquet(output_path, mode='overwrite')
@@ -182,7 +187,8 @@ def save_claim(currated_claim_df: DataFrame, output_path: str):
                 col('admission_source_cd'),
                 col('admission_type_cd'),
                 col('place_of_service'),
-                col('batch_id')) \
+                col('batch_id'),
+                col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('claim_identifier'), col('service_number'))\
         .write.parquet(output_path, mode='overwrite')
@@ -196,17 +202,16 @@ def save_provider(currated_provider_df: DataFrame, output_path: str):
                 col('source_provider_id'),
                 col('provider_type'),
                 col('active'),
-                col('batch_id')) \
-        .repartition(col('npi'))\
+                col('batch_id'),
+                col('date_created')) \
+        .repartition(col('source_provider_id')) \
+        .sortWithinPartitions(col('source_provider_id')) \
         .write.parquet(output_path, mode='overwrite')
 
 
-def save_provider_role(currated_provider_df: DataFrame, output_path: str):
-    currated_provider_df.filter(currated_provider_df.is_valid == True) \
-        .select(col('id'),
-                col('npi'),
-                col('claim_identifier'),
-                col('service_number'),
-                col('role'),
-                col('batch_id')) \
+def save_provider_role(currated_provider_role_df: DataFrame, output_path: str):
+    currated_provider_role_df.filter(currated_provider_role_df.is_valid == True) \
+        .drop(col('is_valid'))\
+        .repartition(col('source_provider_id'), col('claim_identifier'), col('service_number')) \
+        .sortWithinPartitions(col('source_provider_id'), col('claim_identifier'), col('service_number')) \
         .write.parquet(output_path, mode='overwrite')

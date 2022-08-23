@@ -289,8 +289,8 @@ def _to_patient_row(patient_plan: Row) -> Row:
     valid = is_record_valid(validation_errors)
     warn = False
     patient_row = Row(id=uuid.uuid4().hex[:12],
-                      source_org_oid=patient_plan.source_org_oid,
                       source_consumer_id=patient_plan.PATIENT_ID,
+                      source_org_oid=patient_plan.source_org_oid,
                       type=patient_plan.consumer_type,
                       active=patient_plan.consumer_status,
                       dob_raw=patient_plan.PAT_BRTH_YR_NBR,
@@ -531,5 +531,8 @@ def to_practitioner_role(practitioner_df: DataFrame) -> DataFrame:
     return practitioner_df.select(col('npi'),
                                    col('source_provider_id'),
                                    col('claim_identifier'),
+                                   col('service_number'),
                                    col('role'),
+                                   col('is_valid'),
+                                   col('batch_id'),
                                    col('date_created'))

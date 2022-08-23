@@ -232,8 +232,9 @@ raw_org_schema = StructType([
 
 stage_patient_schema = StructType([
     StructField("id", StringType()),
+
     StructField("source_consumer_id", StringType()),
-    StructField("source_org_oid", StringType()),
+StructField("source_org_oid", StringType()),
     StructField("type", StringType()),
     StructField("active", StringType()),
     StructField("dob_raw", StringType()),
