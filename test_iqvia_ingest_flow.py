@@ -242,21 +242,21 @@ create_emr_cluster = EmrCreateJobFlowOperator(
     dag=emr_dag
 )
 
-trigger_processed_emr_job = EmrAddStepsOperator(
-    task_id='trigger_processed_emr_job',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
-    aws_conn_id='aws_default',
-    steps=TO_PROCESSED_SPARK_STEPS,
-    dag=emr_dag
-)
-
-# trigger_curated_emr_job = EmrAddStepsOperator(
-#     task_id='trigger_curated_emr_job',
+# trigger_processed_emr_job = EmrAddStepsOperator(
+#     task_id='trigger_processed_emr_job',
 #     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
 #     aws_conn_id='aws_default',
-#     steps=TO_CURATED_SPARK_STEPS,
+#     steps=TO_PROCESSED_SPARK_STEPS,
 #     dag=emr_dag
 # )
+
+trigger_curated_emr_job = EmrAddStepsOperator(
+    task_id='trigger_curated_emr_job',
+    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+    aws_conn_id='aws_default',
+    steps=TO_CURATED_SPARK_STEPS,
+    dag=emr_dag
+)
 
 # cluster_remover = EmrTerminateJobFlowOperator(
 #     task_id='remove_cluster',
@@ -300,6 +300,6 @@ trigger_processed_emr_job = EmrAddStepsOperator(
 #     task_id='transfer_s3_to_redshift',
 # )
 
-create_emr_cluster >> trigger_processed_emr_job
-# create_emr_cluster >> trigger_curated_emr_job
+# create_emr_cluster >> trigger_processed_emr_job
+create_emr_cluster >> trigger_curated_emr_job
 # create_processed_emr_cluster >> create_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]

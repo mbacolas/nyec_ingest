@@ -44,6 +44,18 @@ def extract_code(result: Either) -> dict:
         return {}
 
 
+# RENDERING_PROVIDER_TYP_ID
+# 1-PROFESSIONAL
+# 2 -ORGANIZATION
+def validate_provider_type(provider_type: str) -> Either:
+    if provider_type == '1':
+        return Right('PROFESSIONAL')
+    elif provider_type == '2':
+        return Right('ORGANIZATION')
+    else:
+        error = {'source_column_name': 'PROVIDER_TYP_ID', 'error': f'invalid PROVIDER_TYP_ID', 'source_column_value': provider_type}
+        return Left(json.dumps(error))
+
 
 # from iqvia.common.functions import *
 def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -> Either:
