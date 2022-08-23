@@ -527,7 +527,7 @@ def to_practitioner(claim_rdd: RDD, ref_lookup) -> RDD:
                     # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
 
 
-def to_practitioner_role_row(practitioner_df: DataFrame) -> DataFrame:
+def to_practitioner_role(practitioner_df: DataFrame) -> DataFrame:
     return practitioner_df.select(col('npi'),
                                    col('source_provider_id'),
                                    col('claim_identifier'),

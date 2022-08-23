@@ -60,7 +60,7 @@ org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
 
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
 raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID').sortWithinPartitions('PATIENT_ID').persist(StorageLevel.MEMORY_AND_DISK)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(1000 * 1000).repartition('PATIENT_ID_CLAIM').sortWithinPartitions('PATIENT_ID_CLAIM').persist(StorageLevel.MEMORY_AND_DISK)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(10 * 1000 * 1000).repartition('PATIENT_ID_CLAIM').sortWithinPartitions('PATIENT_ID_CLAIM').persist(StorageLevel.MEMORY_AND_DISK)
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
 raw_drug_df = load_drug(spark, drug_path, raw_drug_schema)
@@ -210,15 +210,15 @@ practitioner_rdd = to_practitioner(patient_claims_raw_rdd, ref_lookup).persist(S
 save_errors(practitioner_rdd, PRACTIONER, generate_output_path('error'))
 currated_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
 
-practitioner_role_df = to_practitioner_role_row(currated_df)
+currated_practitioner_role_df = to_practitioner_role(currated_df)
 
-save_provider_role(currated_df, generate_output_path('provider_role'))
-save_provider(practitioner_role_df, generate_output_path('provider'))
+save_provider(currated_df, generate_output_path('provider'))
+save_provider_role(currated_practitioner_role_df, generate_output_path('provider_role'))
 
 patient_claims_raw_rdd.unpersist(False)
 currated_df.unpersist(False)
 practitioner_rdd.unpersist(False)
-practitioner_role_df.unpersist(False)
+currated_practitioner_role_df.unpersist(False)
 ###
 
 
