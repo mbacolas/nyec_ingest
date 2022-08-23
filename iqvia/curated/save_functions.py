@@ -83,8 +83,7 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('batch_id'),
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_consumer_id'), col('start_date'), col('code_system'),
-                              col('code'))\
+        .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
         .write.parquet(output_path, mode='overwrite')
 
 
@@ -104,10 +103,9 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
                                 .toDF(stage_procedure__modifier_schema) \
                                 .repartition(col('source_consumer_id')) \
                                 .sortWithinPartitions(col('source_consumer_id'),
-                                                      col('start_date'),
                                                       col('code_system'),
                                                       col('code'),
-                                                      col('date_created')) \
+                                                      col('start_date')) \
                                 .write.parquet(output_path, mode='overwrite')
 
 def save_problem(currated_problem_df: DataFrame, output_path: str):
@@ -122,10 +120,10 @@ def save_problem(currated_problem_df: DataFrame, output_path: str):
                 col('desc'),
                 col('source_desc'),
                 col('is_admitting'),
-                col('batch_id',
-                col('date_created'))) \
+                col('batch_id'),
+                col('date_created')) \
         .repartition(col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_consumer_id'), col('start_date'), col('code_system'), col('code'))\
+        .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
         .write.parquet(output_path, mode='overwrite')
 
 
@@ -146,7 +144,7 @@ def save_drug(currated_drug_df: DataFrame, output_path: str):
                 col('batch_id'),
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_consumer_id'), col('start_date'), col('code_system'), col('code'))\
+        .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
         .write.parquet(output_path, mode='overwrite')
 
 

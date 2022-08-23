@@ -3,17 +3,18 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import StructType
 # import findspark
 
+
 def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimiter='|', file_header=True,
             infer_schema=False):
     if not infer_schema:
         return spark.read \
-            .schema(schema) \
-            .options(inferSchema=False, delimiter=file_delimiter, header=file_header) \
-            .csv(load_path)
+                    .schema(schema) \
+                    .options(inferSchema=False, delimiter=file_delimiter, header=file_header) \
+                    .csv(load_path)
     else:
         return spark.read \
-            .options(inferSchema=True, delimiter=file_delimiter, header=file_header) \
-            .csv(load_path)
+                    .options(inferSchema=True, delimiter=file_delimiter, header=file_header) \
+                    .csv(load_path)
 
 
 def load_plan(spark: SparkSession, load_path: str, schema: StructType):
