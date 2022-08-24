@@ -56,11 +56,20 @@ assert expected_header == header_fields
 ### create data frames
 date_created = datetime.now()
 org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id, date_created)]
-org_df = spark.createDataFrame(data=org_data,schema=raw_org_schema)
+org_df = spark.createDataFrame(data=org_data, schema=raw_org_schema)
 
+# < 256MB per partition
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema).repartition('PATIENT_ID').sortWithinPartitions('PATIENT_ID').persist(StorageLevel.MEMORY_AND_DISK)
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema).limit(10 * 1000 * 1000).repartition('PATIENT_ID_CLAIM').sortWithinPartitions('PATIENT_ID_CLAIM').persist(StorageLevel.MEMORY_AND_DISK)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)\
+                    .repartition('PATIENT_ID')\
+                    .sortWithinPartitions('PATIENT_ID')\
+                    .persist(StorageLevel.MEMORY_AND_DISK)
+
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)\
+                        .repartition('PATIENT_ID_CLAIM')\
+                        .sortWithinPartitions('PATIENT_ID_CLAIM')\
+                        .persist(StorageLevel.MEMORY_AND_DISK)
+
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
 raw_drug_df = load_drug(spark, drug_path, raw_drug_schema)
@@ -126,7 +135,8 @@ print('------------------------>>>>>>> saved patient <<<--- ')
 
 
 ### create clinical events
-patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
+patient_claims_raw_rdd = raw_patient_df\
+    .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created))\
     .rdd\
@@ -203,7 +213,6 @@ print('------------------------>>>>>>> saved claim')
 save_org(org_df, generate_output_path('org'))
 org_df.unpersist()
 ###
-
 
 ### provider
 practitioner_rdd = to_practitioner(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)

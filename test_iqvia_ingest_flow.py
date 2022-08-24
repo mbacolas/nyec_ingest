@@ -40,6 +40,7 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Master nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "MASTER",
+                # "InstanceType": "m5.xlarge",
                 "InstanceType": "m4.xlarge",
                 "InstanceCount": 1
             },
@@ -47,11 +48,12 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Slave nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
-                "InstanceType": "r5.xlarge",
+                # "InstanceType": "r5.xlarge",
+                "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 20
+                "InstanceCount": 2
             }
         ],
         "Ec2SubnetId": subnetID['Parameter']['Value'],
@@ -135,10 +137,10 @@ TO_PROCESSED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
 
                      '--conf',
-                     f'spark.executor.memory=30g',
+                     f'spark.executor.memory=60g',
 
                      '--conf',
-                     f'spark.executor.cores=4',
+                     f'spark.executor.cores=35',
 
                      # '--conf',
                      # f'num-executors=6',
@@ -197,12 +199,12 @@ TO_CURATED_SPARK_STEPS = [
                      '--conf',
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
-                     # '--conf',
-                     # f'spark.executor.memory=14g',
-                     #
-                     # '--conf',
-                     # f'spark.executor.cores=4',
-                     #
+                     '--conf',
+                     f'spark.executor.memory=60g',
+
+                     '--conf',
+                     f'spark.executor.cores=35',
+
                      # '--conf',
                      # f'num-executors=6',
 
@@ -253,21 +255,21 @@ create_emr_cluster = EmrCreateJobFlowOperator(
     dag=emr_dag
 )
 
-trigger_processed_emr_job = EmrAddStepsOperator(
-    task_id='trigger_processed_emr_job',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
-    aws_conn_id='aws_default',
-    steps=TO_PROCESSED_SPARK_STEPS,
-    dag=emr_dag
-)
-
-# trigger_curated_emr_job = EmrAddStepsOperator(
-#     task_id='trigger_curated_emr_job',
+# trigger_processed_emr_job = EmrAddStepsOperator(
+#     task_id='trigger_processed_emr_job',
 #     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
 #     aws_conn_id='aws_default',
-#     steps=TO_CURATED_SPARK_STEPS,
+#     steps=TO_PROCESSED_SPARK_STEPS,
 #     dag=emr_dag
 # )
+
+trigger_curated_emr_job = EmrAddStepsOperator(
+    task_id='trigger_curated_emr_job',
+    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+    aws_conn_id='aws_default',
+    steps=TO_CURATED_SPARK_STEPS,
+    dag=emr_dag
+)
 
 # cluster_remover = EmrTerminateJobFlowOperator(
 #     task_id='remove_cluster',
@@ -311,6 +313,6 @@ trigger_processed_emr_job = EmrAddStepsOperator(
 #     task_id='transfer_s3_to_redshift',
 # )
 
-create_emr_cluster >> trigger_processed_emr_job
-# create_emr_cluster >> trigger_curated_emr_job
+# create_emr_cluster >> trigger_processed_emr_job
+create_emr_cluster >> trigger_curated_emr_job
 # create_processed_emr_cluster >> create_emr_cluster >> [trigger_processed_emr_job, trigger_curated_emr_job]

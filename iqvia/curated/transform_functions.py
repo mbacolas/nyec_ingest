@@ -31,8 +31,12 @@ def is_record_valid(rec: list):
 
 def extract_left(*result: Either):
     error = []
+
     for r in result:
-        if r.is_left():
+        if r is None:
+            error = {'error': f'Value ois None'}
+            error.append(error)
+        elif r.is_left():
             error.append(r.either(lambda x: x, lambda x: x))
     return error
 
@@ -384,9 +388,9 @@ def to_cost(claim_row_rdd: RDD) -> RDD:
 def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     source_claim_type = to_claim_type(claim_row.CLAIM_TYP_CD)
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
-    to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', is_requied=False)
-    admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', is_requied=False)
-    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', is_requied=False) #should be True
+    to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', is_required=False)
+    admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', is_required=False)
+    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', is_required=False) #should be True
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
@@ -400,7 +404,7 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     else:
         validation_warnings = extract_left(*[source_claim_type])
     valid = is_record_valid(validation_errors)
-    warn = is_record_valid(validation_warnings)
+    warn = not is_record_valid(validation_warnings)
 
     cached_plan = ref_lookup(PLAN, claim_row.PLAN_ID)
     # {'PLAN_ID': '20947', 'IMS_PLN_ID': '735', 'IMS_PLN_NM': 'UHC MED ADV GENERAL (HI)', 'IMS_PAYER_ID': '2429',
@@ -463,12 +467,17 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
 
     if claim_row.RENDERING_PROVIDER_ID is not None:
         cached_provider = ref_lookup(PRACTIONER, claim_row.RENDERING_PROVIDER_ID)
+        npi = cached_provider.get('NPI', None)
         source_provider_type_result = validate_provider_type(cached_provider.get('PROVIDER_TYP_ID', None))
         # source_provider_type_result = validate_provider_type(claim_row.RENDERING_PROVIDER_TYP_ID)
-        validation_errors = extract_left(*[source_provider_type_result])
+        validation_errors = []
+        validation_warnings = extract_left(*[source_provider_type_result])
         valid = is_record_valid(validation_errors)
-        validation_warnings = []
-        warn = False
+        validation_warnings =  is_record_valid(validation_warnings)
+        warn = not validation_warnings
+
+        if npi is None:
+            warn.append()
 
         # {'PROVIDER_ID': '10151134',
         #  'PROVIDER_TYP_ID': '1',
