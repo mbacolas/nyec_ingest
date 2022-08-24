@@ -170,4 +170,3 @@ def validate_admission_type_cd(cd: str) -> Either:
         6   THRU 8	Reserved
         9	Unknown - Information not available."""
     return Right(cd)
-

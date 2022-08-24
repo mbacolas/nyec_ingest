@@ -18,19 +18,19 @@ CLAIM = 'CLAIM'
 PRACTIONER = 'PRACTIONER'
 PLAN = 'PLAN'
 
-
-spark = SparkSession\
-            .builder\
-            .appName("test")\
-            .config("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")\
-            .config("fs.s3a.sse.enabled",True)\
-            .config("fs.s3a.server-side-encryption-algorithm", "SSE-KMS")\
-            .appName("IQVIA Ingest") \
-            .getOrCreate()
+spark = SparkSession \
+    .builder \
+    .appName("test") \
+    .config("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+    .config("fs.s3a.sse.enabled", True) \
+    .config("fs.s3a.server-side-encryption-algorithm", "SSE-KMS") \
+    .appName("IQVIA Ingest") \
+    .getOrCreate()
 
 conf = spark.conf
 sqlContext = SQLContext(spark)
 
+start = datetime.now()
 plan_path = conf.get("spark.nyec.iqvia.raw_plan_ingest_path")
 patient_path = conf.get("spark.nyec.iqvia.raw_patient_ingest_path")
 claim_path = conf.get("spark.nyec.iqvia.raw_claim_ingest_path")
@@ -41,6 +41,8 @@ drug_path = conf.get("spark.nyec.iqvia.raw_drug_ingest_path")
 provider_path = conf.get("spark.nyec.iqvia.raw_provider_ingest_path")
 iqvia_curated_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_curated_s3_prefix")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
+
+
 # raw_pro_provider_ingest_path = conf.get("spark.nyec.iqvia.raw_pro_provider_ingest_path")
 
 def generate_output_path(data_set_name: str) -> str:
@@ -52,7 +54,6 @@ header_fields = rdd_test.first().split('|')
 expected_header = claims_header()
 assert expected_header == header_fields
 
-
 ### create data frames
 date_created = datetime.now()
 org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREGATOR", True, batch_id, date_created)]
@@ -60,15 +61,15 @@ org_df = spark.createDataFrame(data=org_data, schema=raw_org_schema)
 
 # < 256MB per partition
 raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema)\
-                    .repartition('PATIENT_ID')\
-                    .sortWithinPartitions('PATIENT_ID')\
-                    .persist(StorageLevel.MEMORY_AND_DISK)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema) \
+    .repartition('PATIENT_ID') \
+    .sortWithinPartitions('PATIENT_ID') \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)\
-                        .repartition('PATIENT_ID_CLAIM')\
-                        .sortWithinPartitions('PATIENT_ID_CLAIM')\
-                        .persist(StorageLevel.MEMORY_AND_DISK)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema) \
+    .repartition('PATIENT_ID_CLAIM') \
+    .sortWithinPartitions('PATIENT_ID_CLAIM') \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
@@ -81,20 +82,22 @@ drug_list = raw_drug_df.collect()
 problem_list = raw_diag_df.filter(raw_diag_df.DIAG_VERS_TYP_ID != -1).collect()
 provider_list = provider_raw.collect()
 
+
 def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -> Either:
     if version_id == '2':
         return Right('ICD10')
     elif version_id == '1':
         return Right('ICD9')
-    elif version_id == '-1' and type_cd=='C':
+    elif version_id == '-1' and type_cd == 'C':
         return Right('CPT')
-    elif version_id == '-1' and type_cd=='H':
+    elif version_id == '-1' and type_cd == 'H':
         return Right('HCPCS')
     else:
         error = {'error': f'Invalid version_id/type_cd combination',
                  'source_column_value': f'{version_id}:{type_cd}',
                  'source_column_name': source_column_name}
         return Left(error)
+
 
 def get_code_system(code_system_version: str, code_system_type: str):
     return to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
@@ -103,24 +106,29 @@ def get_code_system(code_system_version: str, code_system_type: str):
 plan_cache = dict([(row['IMS_PLN_ID'], row.asDict()) for row in plan_list])
 drug_cache = dict([(row['NDC_CD'], row.asDict()) for row in drug_list])
 provider_cache = dict([(row['PROVIDER_ID'], row.asDict()) for row in provider_list])
-problem_cache = dict([(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC'])) for row in problem_list])
+problem_cache = dict(
+    [(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC']))
+     for row in problem_list])
 proc_cache = dict([(row["PRC_CD"] + ':' + row["PRC_VERS_TYP_ID"], row.asDict()) for row in proc_list])
 
-ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache, PLAN: plan_cache}
+ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache,
+             PLAN: plan_cache}
 print('------------------------>>>>>>> broadcasting reference data')
 broadcast_cache = spark.sparkContext.broadcast(ref_cache)
+
 
 def ref_lookup(event_type: str, key: str):
     return broadcast_cache.value[event_type].get(key, {})
 
+
 ### end of create data frames
 
 ### create stage patient DF
-patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id))\
-                            .withColumn('source_org_oid', lit('IQVIA'))\
-                            .withColumn('date_created', lit(date_created))\
-                            .rdd\
-                            .persist(StorageLevel.MEMORY_AND_DISK)
+patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
+    .withColumn('source_org_oid', lit('IQVIA')) \
+    .withColumn('date_created', lit(date_created)) \
+    .rdd \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
 currated_patient_rdd = to_patient(patient_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 patient_rdd.unpersist()
@@ -133,13 +141,12 @@ currated_patient_rdd.unpersist()
 currated_patient_df.unpersist()
 print('------------------------>>>>>>> saved patient <<<--- ')
 
-
 ### create clinical events
-patient_claims_raw_rdd = raw_patient_df\
+patient_claims_raw_rdd = raw_patient_df \
     .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner") \
     .withColumn('batch_id', lit(batch_id)) \
-    .withColumn('date_created', lit(date_created))\
-    .rdd\
+    .withColumn('date_created', lit(date_created)) \
+    .rdd \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
@@ -164,9 +171,9 @@ save_errors(problem_rdd, PROBLEM, generate_output_path('error'))
 admitting_problem_rdd = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(admitting_problem_rdd, PROBLEM, generate_output_path('error'))
 
-currated_df = problem_rdd.union(admitting_problem_rdd)\
-                         .toDF(stage_problem_schema)\
-                         .persist(StorageLevel.MEMORY_AND_DISK)
+currated_df = problem_rdd.union(admitting_problem_rdd) \
+    .toDF(stage_problem_schema) \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
 save_problem(currated_df, generate_output_path('diagnosis'))
 
@@ -230,15 +237,30 @@ practitioner_rdd.unpersist(False)
 currated_practitioner_role_df.unpersist(False)
 ###
 
+file_paths = {'plan': plan_path,
+              'patient': patient_path,
+              'claim': claim_path,
+              'procedure': procedure_path,
+              'proc_modifier': proc_modifier_path,
+              'diagnosis': diagnosis_path,
+              'drug': drug_path,
+              'provider': provider_path}
 
+start = datetime.now()
+end = datetime.now()
+total = end - start
+duration = timedelta(seconds=total.total_seconds())
 
+run_meta = {'data_source': 'IQVIA',
+            'run_date': datetime.now(),
+            'batch_id': batch_id,
+            'file_paths': json.dumps(file_paths),
+            'duration': str(duration),
+            'start': str(start),
+            'end': str(end)}
 
-
-
-
-
-
-
+run_meta_df = spark.createDataFrame(data=run_meta, schema=curated_ingest_run_schema)
+run_meta_df
 ############################ START DRUGS
 # drug_rdd = to_drug(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 #
@@ -260,7 +282,6 @@ currated_practitioner_role_df.unpersist(False)
 #
 
 ############################ END  DRUGS
-
 
 
 # a = patient_claims_raw.select('PATIENT_ID', 'REFERRING_PROVIDER_ID', 'REFERRING_LAST_NM',

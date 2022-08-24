@@ -4,7 +4,7 @@ from airflow import DAG
 import boto3
 from airflow.operators.python import PythonOperator
 
-# from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
+from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
 # from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
 # from airflow.providers.amazon.aws.sensors.emr import EmrStepSensor
 

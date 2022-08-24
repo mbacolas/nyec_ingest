@@ -336,3 +336,13 @@ stage_provider_role_schema = StructType([
     StructField("role", StringType()),
     StructField("date_created", DateType())
 ])
+
+curated_ingest_run_schema = StructType([
+    StructField("data_source", StringType()),
+    StructField("run_date", DateType()),
+    StructField("batch_id", StringType()),
+    StructField("file_paths", StringType()),
+    StructField("duration", StringType()),
+    StructField("start_time", StringType()),
+    StructField("end_time", StringType())
+])

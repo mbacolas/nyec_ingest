@@ -39,6 +39,12 @@ def save_errors(rdd: RDD, row_type: str, output_path: str):
     #     .mode("append") \
     #     .save()
 
+def save_run_meta(meta_df: DataFrame, output_path: str):
+        meta_df.repartition(col('run_date'))\
+                .sortWithinPartitions(col('data_source'))\
+                .write.parquet(output_path, mode='append')
+
+
 def save_org(org_df: DataFrame, output_path: str):
     org_df.select(  col('id'),
                     col('source_org_oid'),
