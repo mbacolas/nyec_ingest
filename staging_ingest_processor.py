@@ -260,7 +260,8 @@ run_meta = {'data_source': 'IQVIA',
             'end': str(end)}
 
 run_meta_df = spark.createDataFrame(data=run_meta, schema=curated_ingest_run_schema)
-run_meta_df
+save_run_meta(run_meta_df, generate_output_path('run_history'))
+
 ############################ START DRUGS
 # drug_rdd = to_drug(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 #

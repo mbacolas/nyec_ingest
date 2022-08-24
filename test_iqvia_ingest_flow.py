@@ -4,7 +4,7 @@ from airflow import DAG
 import boto3
 from airflow.operators.python import PythonOperator
 
-from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
+# from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
 # from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
 # from airflow.providers.amazon.aws.sensors.emr import EmrStepSensor
 
@@ -40,8 +40,9 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Master nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "MASTER",
+                "InstanceType": "m4.large",
                 # "InstanceType": "m5.xlarge",
-                "InstanceType": "m4.xlarge",
+                # "InstanceType": "m4.xlarge",
                 "InstanceCount": 1
             },
             {
@@ -200,10 +201,13 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      '--conf',
-                     f'spark.executor.memory=60g',
+                     f'spark.executor.memory=55g',
 
                      '--conf',
                      f'spark.executor.cores=35',
+
+                     '--conf',
+                     f'spark.sql.shuffle.partitions=1200',
 
                      # '--conf',
                      # f'num-executors=6',
