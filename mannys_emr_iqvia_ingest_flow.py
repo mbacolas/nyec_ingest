@@ -23,6 +23,7 @@ execution_date = "{{ execution_date }}"
 S3_BUCKET_NAME = 'nyec-scripts'
 AWS_REGION = "us-east-1"
 ssm_client = boto3.client("ssm", region_name=AWS_REGION)
+# subnetID = 'subnet-00031e4e4cd2b33a4'
 subnetID = ssm_client.get_parameter(Name='/nyec/dev/subnetID')
 from airflow.models import Variable
 
@@ -40,9 +41,10 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Master nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "MASTER",
-                "InstanceType": "m4.large",
+                # "InstanceType": "c5.large",
+                # "InstanceType": "m4.large",
                 # "InstanceType": "m5.xlarge",
-                # "InstanceType": "m4.xlarge",
+                "InstanceType": "m4.xlarge",
                 "InstanceCount": 1
             },
             {
@@ -57,7 +59,8 @@ JOB_FLOW_OVERRIDES = {
                 "InstanceCount": 2
             }
         ],
-        "Ec2SubnetId": subnetID['Parameter']['Value'],
+        "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
+        # "Ec2SubnetId": subnetID['Parameter']['Value'],
         "TerminationProtected": False,
         "KeepJobFlowAliveWhenNoSteps": False
     },
@@ -88,7 +91,8 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    # return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
@@ -201,13 +205,23 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      '--conf',
-                     f'spark.executor.memory=55g',
+                     f'spark.executor.memory=25g',
 
                      '--conf',
-                     f'spark.executor.cores=35',
+                     f'spark.executor.cores=17',
 
                      '--conf',
-                     f'spark.sql.shuffle.partitions=1200',
+                     f'spark.sql.shuffle.partitions=3500',
+
+                     '--conf',
+                     f'spark.driver.memory=12G',
+
+                     '--conf',
+                     f'spark.driver.cores=2',
+
+                     '--conf',
+                     f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -XX:OnOutOfMemoryError=\'kill -9 %p\'',
+                     # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
 
                      # '--conf',
                      # f'num-executors=6',
@@ -235,8 +249,8 @@ default_args = {
     'schedule_interval': None
 }
 
-emr_dag = DAG(
-    'test_iqvia_ingest_flow',
+mannys_emr_iqvia_ingest_flow = DAG(
+    'mannys_emr_iqvia_ingest_flow',
     default_args=default_args,
     dagrun_timeout=timedelta(hours=2),
     max_active_runs=1
@@ -256,7 +270,7 @@ create_emr_cluster = EmrCreateJobFlowOperator(
     job_flow_overrides=JOB_FLOW_OVERRIDES,
     aws_conn_id='aws_default',
     emr_conn_id='emr_test',
-    dag=emr_dag
+    dag=mannys_emr_iqvia_ingest_flow
 )
 
 # trigger_processed_emr_job = EmrAddStepsOperator(
@@ -272,7 +286,7 @@ trigger_curated_emr_job = EmrAddStepsOperator(
     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
     steps=TO_CURATED_SPARK_STEPS,
-    dag=emr_dag
+    dag=mannys_emr_iqvia_ingest_flow
 )
 
 # cluster_remover = EmrTerminateJobFlowOperator(

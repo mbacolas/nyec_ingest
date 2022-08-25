@@ -103,6 +103,10 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
     modifiers_clean = [i for i in modifiers if i is not None]
 
     proc_row = Row(id=uuid.uuid4().hex[:12],
+                   body_site=None,
+                   outcome=None,
+                   complication=None,
+                   note=None,
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
@@ -155,6 +159,13 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     source_desc = ref_lookup(PROBLEM, f'{diag_code.get("code", None)}:{diag_code.get("code_system", None)}').get('DIAG_SHORT_DESC', None)
 
     diag_row = Row(id=uuid.uuid4().hex[:12],
+                   primary=None,
+                   clinical_status=None,
+                   severity=None,
+                   onset_date=None,
+                   onset_age=None,
+                   abatement_date=None,
+                   abatement_age=None,
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
@@ -202,6 +213,13 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     warn = False
 
     diag_row = Row(id=uuid.uuid4().hex[:12],
+                   primary=None,
+                   clinical_status=None,
+                   severity=None,
+                   onset_date=None,
+                   onset_age=None,
+                   abatement_date=None,
+                   abatement_age=None,
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.HOSP_ADMT_DT,
@@ -246,6 +264,15 @@ def _to_drug_row(claim_row: Row, ref_lookup) -> Row:
     cached_drug = ref_lookup(DRUG, drug_code.get("code", None))
 
     drug_row = Row(id=uuid.uuid4().hex[:12],
+                   status=None,
+                   discontinued_date=None,
+                   days_supply=None,
+                   dispense_qty=None,
+                   dosage=None,
+                   dosage_unit=None,
+                   refills=None,
+                   dosage_instructions=None,
+                   dosage_indication=None,
                    source_consumer_id=claim_row.PATIENT_ID,
                    source_org_oid=claim_row.source_org_oid,
                    start_date_raw=claim_row.SVC_FR_DT,
@@ -378,7 +405,15 @@ def _to_cost_row(claim_row: Row) -> Row:
     validation_warnings = []
     warn = False
     cost_row = Row(id=uuid.uuid4().hex[:12],
-                   source_consumer_id=claim_row.PATIENT_ID,
+
+                    co_payment=None,
+                    deductible_amount=None,
+                    coinsurance=None,
+                    covered_amount=None,
+                    allowed_amount=None,
+                    not_covered_amount=None,
+
+                    source_consumer_id=claim_row.PATIENT_ID,
                     source_org_oid=claim_row.source_org_oid,
                     claim_identifier=claim_row.CLAIM_ID,
                     service_number=claim_row.SVC_NBR,

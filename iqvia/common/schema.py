@@ -123,6 +123,10 @@ stage_procedure__modifier_schema = StructType([
 
 stage_procedure_schema = StructType([
     StructField("id", StringType()),
+    StructField("body_site", StringType()),
+    StructField("outcome", StringType()),
+    StructField("complication", StringType()),
+    StructField("note", StringType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("start_date_raw", StringType()),
@@ -149,6 +153,13 @@ stage_procedure_schema = StructType([
 
 stage_problem_schema = StructType([
     StructField("id", StringType()),
+    StructField("primary", BooleanType()),
+    StructField("clinical_status", StringType()),
+    StructField("severity", StringType()),
+    StructField("onset_date", DateType()),
+    StructField("onset_age", IntegerType()),
+    StructField("abatement_date", DateType()),
+    StructField("abatement_age", IntegerType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("start_date_raw", StringType()),
@@ -181,6 +192,15 @@ error_schema = StructType([
 
 stage_drug_schema = StructType([
     StructField("id", StringType()),
+    StructField("status", StringType()),
+    StructField("discontinued_date", DateType()),
+    StructField("days_supply", DecimalType()),
+    StructField("dispense_qty", DecimalType()),
+    StructField("dosage", StringType()),
+    StructField("dosage_unit", StringType()),
+    StructField("refills", DecimalType()),
+    StructField("dosage_instructions", StringType()),
+    StructField("dosage_indication", StringType()),
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("start_date_raw", StringType()),
@@ -230,21 +250,6 @@ raw_org_schema = StructType([
 #     StructField("batch_id", StringType()),
 #     StructField("date_created", DateType())
 # ])
-mpi = None,
-prefix = None,
-suffix = None,
-first_name = None,
-middle_name = None,
-last_name = None,
-dod = None,
-ssn = None,
-ethnicity = None,
-race = None,
-deceased = None,
-marital_status = None,
-phone = None,
-email = None,
-address = None,
 
 stage_patient_schema = StructType([
     StructField("id", StringType()),
@@ -279,9 +284,52 @@ stage_patient_schema = StructType([
     StructField("date_created", DateType())
 ])
 
+stage_telcom_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("source_org_oid", StringType()),
+    StructField("claim_identifier", StringType()),
+    StructField("service_number", StringType()),
+    StructField("paid_amount_raw", StringType()),
+    StructField("paid_amount", DecimalType()),
+    StructField("error", ArrayType(StringType())),
+    StructField("warning", ArrayType(StringType())),
+    StructField("is_valid", BooleanType()),
+    StructField("has_warnings", BooleanType()),
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
+])
+
+stage_address_schema = StructType([
+    StructField("id", StringType()),
+    StructField("source_consumer_id", StringType()),
+    StructField("source_org_oid", StringType()),
+    StructField("primary", BooleanType()),
+    StructField("use", StringType()),
+    StructField("type", StringType()),
+    StructField("address_line_1", ArrayType(StringType())),
+    StructField("address_line_2", ArrayType(StringType())),
+    StructField("city", BooleanType()),
+    StructField("state", BooleanType()),
+    StructField("zip", BooleanType()),
+    StructField("start_date", BooleanType()),
+    StructField("end_date", BooleanType()),
+    StructField("batch_id", StringType()),
+    StructField("date_created", DateType())
+])
 
 stage_cost_schema = StructType([
     StructField("id", StringType()),
+
+    StructField("co_payment", DecimalType()),
+    StructField("deductible_amount", DecimalType()),
+    StructField("coinsurance", DecimalType()),
+    StructField("covered_amount", DecimalType()),
+    StructField("allowed_amount", DecimalType()),
+    StructField("not_covered_amount", DecimalType()),
+
+
+
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("claim_identifier", StringType()),

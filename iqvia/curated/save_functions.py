@@ -109,6 +109,10 @@ def save_patient(currated_patient_df: DataFrame, output_path: str):
 def save_procedure(currated_procedure_df: DataFrame, output_path: str):
     currated_procedure_df.filter(currated_procedure_df.is_valid == True) \
         .select(col('id'),
+                col('body_site'),
+                col('outcome'),
+                col('complication'),
+                col('note'),
                 col('source_consumer_id'),
                 col('source_org_oid'),
                 col('start_date'),
@@ -149,6 +153,14 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
 def save_problem(currated_problem_df: DataFrame, output_path: str):
     currated_problem_df.filter(currated_problem_df.is_valid == True) \
         .select(col('id'),
+                col('primary'),
+                col('clinical_status'),
+                col('severity'),
+                col('onset_date'),
+                col('onset_age'),
+                col('abatement_date'),
+                col('source_consumer_id'),
+                col('abatement_age'),
                 col('source_consumer_id'),
                 col('source_org_oid'),
                 col('start_date'),
@@ -168,6 +180,15 @@ def save_problem(currated_problem_df: DataFrame, output_path: str):
 def save_drug(currated_drug_df: DataFrame, output_path: str):
     currated_drug_df.filter(currated_drug_df.is_valid == True) \
         .select(col('id'),
+                col('status'),
+                col('discontinued_date'),
+                col('days_supply'),
+                col('dispense_qty'),
+                col('dosage'),
+                col('dosage_unit'),
+                col('refills'),
+                col('dosage_instructions'),
+                col('dosage_indication'),
                 col('source_consumer_id'),
                 col('source_org_oid'),
                 col('start_date'),
@@ -189,6 +210,12 @@ def save_drug(currated_drug_df: DataFrame, output_path: str):
 def save_cost(currated_cost_df: DataFrame, output_path: str):
     currated_cost_df.filter(currated_cost_df.is_valid == True) \
         .select(col('id'),
+                col('co_payment'),
+                col('deductible_amount'),
+                col('coinsurance'),
+                col('covered_amount'),
+                col('allowed_amount'),
+                col('not_covered_amount'),
                 col('source_consumer_id'),
                 col('source_org_oid'),
                 col('claim_identifier'),
