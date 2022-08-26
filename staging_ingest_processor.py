@@ -41,6 +41,7 @@ drug_path = conf.get("spark.nyec.iqvia.raw_drug_ingest_path")
 provider_path = conf.get("spark.nyec.iqvia.raw_provider_ingest_path")
 iqvia_curated_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_curated_s3_prefix")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
+file_format = conf.get("spark.nyec.iqvia.file_format", 'parquet')
 
 
 # raw_pro_provider_ingest_path = conf.get("spark.nyec.iqvia.raw_pro_provider_ingest_path")
@@ -49,10 +50,10 @@ def generate_output_path(data_set_name: str) -> str:
     return f'{iqvia_curated_s3_prefix}/{data_set_name}/'
 
 
-rdd_test = spark.sparkContext.textFile(claim_path)
-header_fields = rdd_test.first().split('|')
-expected_header = claims_header()
-assert expected_header == header_fields
+# rdd_test = spark.sparkContext.textFile(claim_path)
+# header_fields = rdd_test.first().split('|')
+# expected_header = claims_header()
+# assert expected_header == header_fields
 
 ### create data frames
 date_created = datetime.now()
@@ -60,21 +61,22 @@ org_data = [(uuid.uuid4().hex[:12], "IQVIA", "IQVIA", "THIRD PARTY CLAIMS AGGREG
 org_df = spark.createDataFrame(data=org_data, schema=raw_org_schema)
 
 # < 256MB per partition
-raw_plan_df = load_plan(spark, plan_path, raw_plan_schema)
-raw_patient_df = load_patient(spark, patient_path, raw_patient_schema) \
+raw_plan_df = load_plan(spark, plan_path, raw_plan_schema, file_format)
+raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_format) \
     .repartition('PATIENT_ID') \
     .sortWithinPartitions('PATIENT_ID') \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema) \
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
+    .limit(100 * 1000 * 1000)\
     .repartition('PATIENT_ID_CLAIM') \
     .sortWithinPartitions('PATIENT_ID_CLAIM') \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
-raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema)
-raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema)
-raw_drug_df = load_drug(spark, drug_path, raw_drug_schema)
-provider_raw = load_provider(spark, provider_path, raw_provider_schema)
+raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
+raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format)
+raw_drug_df = load_drug(spark, drug_path, raw_drug_schema, file_format)
+provider_raw = load_provider(spark, provider_path, raw_provider_schema, file_format)
 
 plan_list = raw_plan_df.collect()
 proc_list = raw_proc_df.collect()
@@ -154,7 +156,7 @@ print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
 ### create procedure
 procedure_rdd = to_procedure(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
+# save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
 save_procedure_modifiers(procedure_rdd, generate_output_path('proceduremodifier'))
 
 currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)

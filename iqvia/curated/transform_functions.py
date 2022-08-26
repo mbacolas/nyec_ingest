@@ -405,14 +405,12 @@ def _to_cost_row(claim_row: Row) -> Row:
     validation_warnings = []
     warn = False
     cost_row = Row(id=uuid.uuid4().hex[:12],
-
                     co_payment=None,
                     deductible_amount=None,
                     coinsurance=None,
                     covered_amount=None,
                     allowed_amount=None,
                     not_covered_amount=None,
-
                     source_consumer_id=claim_row.PATIENT_ID,
                     source_org_oid=claim_row.source_org_oid,
                     claim_identifier=claim_row.CLAIM_ID,

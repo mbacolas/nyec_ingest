@@ -320,16 +320,12 @@ stage_address_schema = StructType([
 
 stage_cost_schema = StructType([
     StructField("id", StringType()),
-
     StructField("co_payment", DecimalType()),
     StructField("deductible_amount", DecimalType()),
     StructField("coinsurance", DecimalType()),
     StructField("covered_amount", DecimalType()),
     StructField("allowed_amount", DecimalType()),
     StructField("not_covered_amount", DecimalType()),
-
-
-
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("claim_identifier", StringType()),
