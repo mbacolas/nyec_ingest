@@ -67,6 +67,73 @@ raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_form
     .sortWithinPartitions('PATIENT_ID') \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
+n_salt_bins = 100
+import random
+from random import randint
+
+
+
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format).limit(10000)
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
+windowSpec  = Window.partitionBy("PATIENT_ID_CLAIM").orderBy("PATIENT_ID_CLAIM")
+
+claims_df = raw_claim_df.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'))
+x = claims_df.repartition(10, 'PATIENT_ID_CLAIM')
+# x.rdd.getNumPartitions()
+# x.select('PATIENT_ID_CLAIM').distinct().count()
+# x = claims_df.repartition(10)
+y = x.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'), spark_partition_id().alias("partition_id"))
+y.show(1000)
+z = y.withColumn("row_number", row_number().over(windowSpec))
+z.select('PATIENT_ID_CLAIM', 'row_number', 'partition_id').distinct().show(1000)
+
+assert False
+
+z.select('row_number', 'partition_id').distinct().show(1000)
+z.rdd.getNumPartitions()
+
+all_rows = z.collect()
+
+parts = {}
+for r in all_rows:
+    parts['row_number'] = r.row_number
+    parts['partition_id'] = r.partition_id
+
+def f(part):
+    for r in part:
+        print(r)
+        # print(f'{r.PATIENT_ID_CLAIM} : {r.row_number} : {r.pid}')
+
+claims_df_part = claims_df.repartition(100)
+claims_df.foreachPartition(f)
+
+claims_df  = raw_claim_df\
+    .select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'))\
+    .withColumn("row_number",row_number().over(windowSpec))\
+    .select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'), col('row_number'), spark_partition_id().alias('pid'))
+
+claims_df  = raw_claim_df\
+    .select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT')).repartition(10)
+
+raw_claim_df.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'))\
+    .withColumn("salt", random.randrange(1, 10)).show(truncate=False)
+raw_claim_df.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT')).withColumn("row_number",row_number().over(windowSpec))
+
+from pyspark.sql.functions import rand,when
+
+salted_df = claims_df.withColumn("salt", (100*rand()).cast(IntegerType()))
+salted_df = claims_df.withColumn("salt", random.randrange(1, 10)).show()
+
+
+salted_df2 = salted_df.withColumn("salt",salted_df.salt.cast(IntegerType())).printSchema()
+
+"""rank"""
+from pyspark.sql.functions import rank
+claims_df.filter(col('PATIENT_ID_CLAIM')=='10000144251').withColumn("rank",percent_rank().over(windowSpec)).show()
+claims_df.withColumn("rank",percent_rank().over(windowSpec)).show()
+
+
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
     .repartition('PATIENT_ID_CLAIM') \
     .sortWithinPartitions('PATIENT_ID_CLAIM') \
