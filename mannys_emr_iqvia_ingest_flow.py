@@ -211,10 +211,10 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.executor.memory=50g',
 
                      '--conf',
-                     f'spark.executor.cores=34',
+                     f'spark.executor.cores=35',
 
                      '--conf',
-                     f'spark.sql.shuffle.partitions=3500',
+                     f'spark.sql.shuffle.partitions=35000',
 
                      '--conf',
                      f'spark.driver.memory=12G',

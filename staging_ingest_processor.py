@@ -68,11 +68,10 @@ raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_form
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
-    .limit(100 * 1000 * 1000)\
     .repartition('PATIENT_ID_CLAIM') \
     .sortWithinPartitions('PATIENT_ID_CLAIM') \
     .persist(StorageLevel.MEMORY_AND_DISK)
-
+# .limit(10 * 1000 * 1000)\
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format)
 raw_drug_df = load_drug(spark, drug_path, raw_drug_schema, file_format)

@@ -69,7 +69,7 @@ def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -
         return Right('ICD9')
     elif version_id == '-1' and type_cd=='C':
         return Right('CPT')
-    elif version_id == '-1' and type_cd=='H':
+    elif version_id == '-1' and type_cd == 'H':
         return Right('HCPCS')
     else:
         error = {'error': f'Invalid version_id/type_cd combination',
@@ -137,9 +137,10 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
 def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
                     .map(lambda r: _to_procedure_row(r, ref_lookup))\
-                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .reduceByKey((lambda a,b: a))\
+                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
+                    # .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 
 
 def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
@@ -193,9 +194,10 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
 def to_problem(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
                     .map(lambda r: _to_problem_row(r, ref_lookup))\
-                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
+                    # .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 
 
 def _to_admitting_diagnosis(claim_row: Row) -> Row:
