@@ -211,10 +211,10 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.executor.memory=50g',
 
                      '--conf',
-                     f'spark.executor.cores=35',
+                     f'spark.executor.cores=34',
 
                      '--conf',
-                     f'spark.sql.shuffle.partitions=35000',
+                     f'spark.sql.shuffle.partitions=10000',
 
                      '--conf',
                      f'spark.driver.memory=12G',
@@ -227,7 +227,7 @@ TO_CURATED_SPARK_STEPS = [
                      # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
 
                      '--conf',
-                     f'num-executors=4',
+                     f'num-executors=10',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',

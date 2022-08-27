@@ -148,7 +148,8 @@ stage_procedure_schema = StructType([
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
     StructField("batch_id", StringType()),
-    StructField("date_created", DateType())
+    StructField("date_created", DateType()),
+    StructField("salt", IntegerType())
 ])
 
 stage_problem_schema = StructType([

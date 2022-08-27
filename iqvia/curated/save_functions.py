@@ -19,7 +19,7 @@ def save_errors(rdd: RDD, row_type: str, output_path: str):
                            date_created=r.date_created)) \
         .toDF(error_schema) \
         .write\
-        .parquet(output_path, mode='overwrite')
+        .parquet(output_path, mode='overwrite', compression='snappy')
 
         # .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
     # rdd.filter(lambda r: r.is_included == False) \
@@ -42,7 +42,7 @@ def save_errors(rdd: RDD, row_type: str, output_path: str):
 def save_run_meta(meta_df: DataFrame, output_path: str):
         meta_df.repartition(col('run_date'))\
                 .sortWithinPartitions(col('data_source'))\
-                .write.parquet(output_path, mode='append')
+                .write.parquet(output_path, mode='append', compression='snappy')
 
 
 def save_org(org_df: DataFrame, output_path: str):
@@ -54,24 +54,9 @@ def save_org(org_df: DataFrame, output_path: str):
                     col('batch_id'),
                     col('date_created')) \
         .write\
-        .parquet(output_path, mode='overwrite')
+        .parquet(output_path, mode='overwrite', compression='snappy')
 
 
-mpi = None,
-prefix = None,
-suffix = None,
-first_name = None,
-middle_name = None,
-last_name = None,
-dod = None,
-ssn = None,
-ethnicity = None,
-race = None,
-deceased = None,
-marital_status = None,
-phone = None,
-email = None,
-address = None,
 def save_patient(currated_patient_df: DataFrame, output_path: str):
     currated_patient_df.filter(currated_patient_df.is_valid == True) \
         .select(col('id'),
@@ -101,7 +86,7 @@ def save_patient(currated_patient_df: DataFrame, output_path: str):
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'))\
         .write\
-        .parquet(output_path, mode='overwrite')
+        .parquet(output_path, mode='overwrite', compression='snappy')
 
     # .sortWithinPartitions(col('source_org_oid'), col('source_consumer_id')) \
         # .repartition(col('source_org_oid'), col('source_consumer_id'))\
@@ -126,7 +111,7 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 
 def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str):
@@ -148,7 +133,7 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
                                                       col('code_system'),
                                                       col('code'),
                                                       col('start_date')) \
-                                .write.parquet(output_path, mode='overwrite')
+                                .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 def save_problem(currated_problem_df: DataFrame, output_path: str):
     currated_problem_df.filter(currated_problem_df.is_valid == True) \
@@ -173,7 +158,7 @@ def save_problem(currated_problem_df: DataFrame, output_path: str):
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 
 def save_drug(currated_drug_df: DataFrame, output_path: str):
@@ -203,7 +188,7 @@ def save_drug(currated_drug_df: DataFrame, output_path: str):
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 
 def save_cost(currated_cost_df: DataFrame, output_path: str):
@@ -224,7 +209,7 @@ def save_cost(currated_cost_df: DataFrame, output_path: str):
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('claim_identifier'), col('service_number'))\
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 
 def save_claim(currated_claim_df: DataFrame, output_path: str):
@@ -253,7 +238,7 @@ def save_claim(currated_claim_df: DataFrame, output_path: str):
                 col('date_created')) \
         .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('claim_identifier'), col('service_number'))\
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 
 def save_provider(currated_provider_df: DataFrame, output_path: str):
@@ -268,7 +253,7 @@ def save_provider(currated_provider_df: DataFrame, output_path: str):
                 col('date_created')) \
         .repartition(col('source_provider_id')) \
         .sortWithinPartitions(col('source_provider_id')) \
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')
 
 
 def save_provider_role(currated_provider_role_df: DataFrame, output_path: str):
@@ -276,4 +261,4 @@ def save_provider_role(currated_provider_role_df: DataFrame, output_path: str):
         .drop(col('is_valid'))\
         .repartition(col('source_provider_id'), col('claim_identifier'), col('service_number')) \
         .sortWithinPartitions(col('source_provider_id'), col('claim_identifier'), col('service_number')) \
-        .write.parquet(output_path, mode='overwrite')
+        .write.parquet(output_path, mode='overwrite', compression='snappy')

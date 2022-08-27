@@ -34,22 +34,45 @@ conf = spark.conf
 # patient_path = conf.get("spark.nyec.iqvia.patient_ingest_path")
 # claim_path = conf.get("spark.nyec.iqvia.claims_ingest_path")
 
-plan_ingest_path = conf.get("spark.nyec.iqvia.spark.nyec.iqvia.plan_ingest_path")
-output_path = 's3://nyce-iqvia/processed-parquet/plan_test/'
 
-rdd_test = spark.sparkContext.textFile('s3://nyce-iqvia/adhoc/raw/OrganizationData.csv')
-header_fields = rdd_test.first().split(',')
-print(header_fields)
-expected_header = claims_header()
-if expected_header == header_fields:
-    print('********************* PASSED *********************')
-else:
-    print('********************* FAILED *********************')
+n_salt_bins = 100
+import random
+from random import randint
 
-batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
-raw_patient_df = load_patient(spark, plan_ingest_path, raw_plan_schema)
-# raw_claim_df = load_claim(spark, claim_path, raw_claim_schema)
 
-# patient_claims_raw_rdd = raw_patient_df.join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID], how="inner")\
-#                                 .withColumn('batch_id', lit(batch_id)) \
-raw_patient_df.write.parquet(output_path, mode='overwrite')
+
+raw_claim_df = load_claim(spark, '/Users/emmanuel.bacolas/Downloads/nyec/iqvia_data/factdx/FactDx_202004.dat.gz', raw_claim_schema, 'csv') #.limit(10000)
+# raw_claim_df = load_claim(spark, '/tmp/claim', raw_claim_schema, 'parquet').limit(10000)
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
+# windowSpec  = Window.partitionBy("PATIENT_ID_CLAIM").orderBy("PATIENT_ID_CLAIM")
+
+claims_df = raw_claim_df.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'))
+salted_df = claims_df.withColumn("salt", (20*rand()).cast(IntegerType())).show()
+
+# x = claims_df.partitionBy(col('PATIENT_ID_CLAIM'))
+# x = claims_df.rdd.map(lambda r: (r.PATIENT_ID_CLAIM, r)).partitionBy(2)
+# x = claims_df.rdd.partitionBy(10, lambda r: (r.PATIENT_ID_CLAIM, r)).first()
+x = salted_df.repartition(100, salted_df.PATIENT_ID_CLAIM, salted_df.salt)
+salted_df.repartition(10, salted_df.PATIENT_ID_CLAIM, salted_df.salt).explain()
+x.limit(100).rdd.keyBy(lambda r: (r.PATIENT_ID_CLAIM, r.salt)).partitionBy(100, lambda k: int(k[0])).reduceByKey((lambda a, b: a))  #.glom().collect()
+salted_df.rdd.map(lambda r: (r.PATIENT_ID_CLAIM, r)).partitionBy(5, lambda k: int(k[0])).first()
+y = salted_df.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'), col('salt'), spark_partition_id().alias("partition_id")).repartition(salted_df.PATIENT_ID_CLAIM, salted_df.salt)
+y.explain()
+salted_df.select('PATIENT_ID_CLAIM', 'salt').sort(('PATIENT_ID_CLAIM')).show(1000)
+y.select('partition_id').distinct().count()
+
+
+salted_df = claims_df.withColumn("salt", (10*rand()).cast(IntegerType()))
+# x.rdd.getNumPartitions()
+# x.select('PATIENT_ID_CLAIM').distinct().count()
+# x = claims_df.repartition(10)
+y = x.select(col('PATIENT_ID_CLAIM'), col('CLAIM_ID'), col('PRC_CD'), col('SVC_FR_DT'), spark_partition_id().alias("partition_id"))
+y.select('partition_id').distinct().show(1000)
+z = y.withColumn("row_number", row_number().over(windowSpec))
+
+z.select('PATIENT_ID_CLAIM', 'row_number', 'partition_id').distinct().show(1000)
+# y.show(1000)
+# z = y.withColumn("row_number", row_number().over(windowSpec))
+# z.select('PATIENT_ID_CLAIM', 'row_number', 'partition_id').distinct().show(1000)
+

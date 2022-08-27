@@ -130,18 +130,31 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
                    is_valid=valid,
                    has_warnings=warn,
                    batch_id=claim_row.batch_id,
-                   date_created=claim_row.date_created)
+                   date_created=claim_row.date_created,
+                   salt=claim_row.PATIENT_SALT)
     return proc_row
 
+# .keyBy(lambda r: (r.patient_salt, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+#     .partitionBy(5000, lambda k: int(k[0])) \
+#     .reduceByKey((lambda a, b: a)) \
+#     .map(lambda r: r[1]) \
 
-def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
+from pyspark import StorageLevel
+from iqvia.common.schema import *
+def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
-                    .map(lambda r: _to_procedure_row(r, ref_lookup))\
-                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])
-                    # .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .map(lambda r: _to_procedure_row(r, ref_lookup)) \
+                    .toDF(stage_procedure_schema)\
+                    .repartition(12000, "source_consumer_id", 'start_date', 'code_system', 'start_date') \
+                    .dropDuplicates("source_consumer_id", 'start_date', 'code_system', 'start_date')\
+                    .persist(StorageLevel.MEMORY_AND_DISK)
+                    # .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    # .reduceByKey((lambda a, b: a)) \
+                    # .map(lambda r: r[1])\
 
+# .partitionBy(6000, lambda k: int(k[0])) \
+
+# .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 
 def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
@@ -179,7 +192,6 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
                    code_system=diag_code.get('code_system', None),
                    desc=diag_code.get('desc', None),
                    source_desc=source_desc,
-                   # source_desc=claim_row.DIAG_SHORT_DESC,
                    is_admitting=False,
                    error=validation_errors,
                    warning=validation_warnings,
@@ -195,6 +207,7 @@ def to_problem(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
                     .map(lambda r: _to_problem_row(r, ref_lookup))\
                     .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .partitionBy(12000, lambda k: int(k[0])) \
                     .reduceByKey((lambda a, b: a))\
                     .map(lambda r: r[1])
                     # .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
@@ -313,7 +326,7 @@ def to_drug(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd \
         .filter(lambda r: r.NDC_CD is not None) \
         .map(lambda r: _to_drug_row(r, ref_lookup))\
-        .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+        .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
         .reduceByKey((lambda a, b: a))\
         .map(lambda r: r[1])
 
@@ -544,7 +557,7 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
                                     source_org_oid=claim_row.source_org_oid,
                                     first_name=cached_provider.get('FIRST_NM', None),
                                     # first_name=claim_row.RENDERING_FIRST_NM,
-                                    last_name=cached_provider.get('FIRST_NM', None),
+                                    last_name=cached_provider.get('LAST_NM', None),
                                     # last_name=claim_row.RENDERING_LAST_NM,
                                     source_provider_id=claim_row.RENDERING_PROVIDER_ID,
                                     provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
