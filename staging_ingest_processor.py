@@ -100,21 +100,20 @@ raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
     .repartition(6000, 'PATIENT_ID_CLAIM') \
     .sortWithinPartitions('PATIENT_ID_CLAIM') \
     .persist(StorageLevel.MEMORY_AND_DISK)
-# .limit(10 * 1000 * 1000)\
-raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
 
-raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format)
+raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format).limit(1000)
+raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format).limit(1000)
 provider_raw = load_provider(spark, provider_path, raw_provider_schema, file_format).select(col('PROVIDER_ID'),
                                                                                                 col('PROVIDER_TYP_ID'),
                                                                                                 col('NPI'),
                                                                                                 col('FIRST_NM'),
-                                                                                                col('LAST_NM'))
+                                                                                                col('LAST_NM')).limit(1000)
 
 raw_drug_df = load_drug(spark, drug_path, raw_drug_schema, file_format).select(col('NDC_CD'),
                                                                                 col('MKTED_PROD_NM'),
                                                                                 col('STRNT_DESC'),
                                                                                 col('DOSAGE_FORM_NM'),
-                                                                                col('USC_DESC'))
+                                                                                col('USC_DESC')).limit(1000)
 
 plan_list = raw_plan_df.collect()
 proc_list = raw_proc_df.collect()
@@ -140,7 +139,7 @@ def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -
 
 
 def get_code_system(code_system_version: str, code_system_type: str):
-    return to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
+    result = to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
 
 
 plan_cache = dict([(row['IMS_PLN_ID'], row.asDict()) for row in plan_list])
@@ -149,7 +148,8 @@ provider_cache = dict([(row['PROVIDER_ID'], row.asDict()) for row in provider_li
 problem_cache = dict(
     [(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC']))
      for row in problem_list])
-proc_cache = dict([(row["PRC_CD"] + ':' + row["PRC_VERS_TYP_ID"], row.asDict()) for row in proc_list])
+
+proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']), row.asDict()) for row in proc_list if get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']) is not None])
 
 ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache,
              PLAN: plan_cache}
