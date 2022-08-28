@@ -6,6 +6,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
 from pymonad.either import *
 # from staging_ingest_processor import ref_lookup
+from pyspark import StorageLevel
 
 RENDERING = 'RENDERING'
 REFERRING = 'REFERRING'
@@ -139,22 +140,16 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
 #     .reduceByKey((lambda a, b: a)) \
 #     .map(lambda r: r[1]) \
 
-from pyspark import StorageLevel
-from iqvia.common.schema import *
-def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
+
+def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
                     .map(lambda r: _to_procedure_row(r, ref_lookup)) \
-                    .toDF(stage_procedure_schema)\
-                    .repartition(12000, "source_consumer_id", 'start_date', 'code_system', 'start_date') \
-                    .dropDuplicates("source_consumer_id", 'start_date', 'code_system', 'start_date')\
+                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+                    .reduceByKey((lambda a, b: a)) \
+                    .map(lambda r: r[1]) \
                     .persist(StorageLevel.MEMORY_AND_DISK)
-                    # .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    # .reduceByKey((lambda a, b: a)) \
-                    # .map(lambda r: r[1])\
 
-# .partitionBy(6000, lambda k: int(k[0])) \
-
-# .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 
 def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
@@ -207,9 +202,11 @@ def to_problem(claim_rdd: RDD, ref_lookup) -> RDD:
     return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
                     .map(lambda r: _to_problem_row(r, ref_lookup))\
                     .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .partitionBy(12000, lambda k: int(k[0])) \
+                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
                     .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])
+                    .map(lambda r: r[1]) \
+                    .persist(StorageLevel.MEMORY_AND_DISK)
+                    # .partitionBy(12000, lambda k: int(k[0])) \
                     # .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 
 
@@ -261,8 +258,10 @@ def to_admitting_diagnosis(claim_rdd: RDD) -> RDD:
     return claim_rdd.filter(lambda r: r.ADMS_DIAG_CD is not None)\
                     .map(lambda r: _to_admitting_diagnosis(r))\
                     .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
                     .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])
+                    .map(lambda r: r[1])\
+                    .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_drug_row(claim_row: Row, ref_lookup) -> Row:
@@ -327,8 +326,10 @@ def to_drug(claim_rdd: RDD, ref_lookup) -> RDD:
         .filter(lambda r: r.NDC_CD is not None) \
         .map(lambda r: _to_drug_row(r, ref_lookup))\
         .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+        .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
         .reduceByKey((lambda a, b: a))\
-        .map(lambda r: r[1])
+        .map(lambda r: r[1])\
+        .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def is_inpatient(hosp_admt_dt: str):
@@ -380,11 +381,20 @@ def _to_patient_row(patient_plan: Row) -> Row:
 
 
 def to_patient(patient_plan_rdd: RDD) -> RDD:
-    return patient_plan_rdd.map(lambda r: _to_patient_row(r))\
+    return patient_plan_rdd\
+                        .map(lambda r: _to_patient_row(r))\
                         .keyBy(lambda r: (r.source_consumer_id)) \
+                        .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
                         .reduceByKey((lambda a, b: a))\
-                        .map(lambda r: r[1])
+                        .map(lambda r: r[1])\
+                        .persist(StorageLevel.MEMORY_AND_DISK)
 
+
+# rdd = sc.parallelize([(0, 5), (3, 8), (2, 6), (0, 8), (3, 8), (1, 3)])
+# rdd2 = rdd.keyBy(lambda r: (r[0]))
+# rdd3 = rdd2.repartitionAndSortWithinPartitions(numPartitions=4, partitionFunc=lambda r: r)
+# rdd4 = rdd3.reduceByKey((lambda a, b: a)).map(lambda r: r[1])
+# rdd4.glom().collect()
 # def _to_org_row(patient_plan: Row) -> Row:
 #     row_id = uuid.uuid4().hex[:12]
 #     org_row = Row(id=row_id,
@@ -442,10 +452,13 @@ def _to_cost_row(claim_row: Row) -> Row:
 
 
 def to_cost(claim_row_rdd: RDD) -> RDD:
-    return claim_row_rdd.map(lambda r: _to_cost_row(r)) \
+    return claim_row_rdd\
+                    .map(lambda r: _to_cost_row(r)) \
                     .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier, r.service_number, r.paid_amount)) \
+                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
                     .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])
+                    .map(lambda r: r[1])\
+                    .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
@@ -521,8 +534,10 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
 def to_claim(claim_raw: RDD, ref_lookup) -> RDD:
     return claim_raw.map(lambda r: _to_claim_row(r, ref_lookup))\
                     .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier)) \
+                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
                     .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])
+                    .map(lambda r: r[1])\
+                    .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
@@ -611,7 +626,7 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
 
 
 def to_practitioner(claim_rdd: RDD, ref_lookup) -> RDD:
-    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r, ref_lookup))
+    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r, ref_lookup)).persist(StorageLevel.MEMORY_AND_DISK)
                     # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
 
 
@@ -623,4 +638,5 @@ def to_practitioner_role(practitioner_df: DataFrame) -> DataFrame:
                                    col('role'),
                                    col('is_valid'),
                                    col('batch_id'),
-                                   col('date_created'))
+                                   col('date_created'))\
+            .persist(StorageLevel.MEMORY_AND_DISK)

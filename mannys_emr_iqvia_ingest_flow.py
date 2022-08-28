@@ -91,8 +91,8 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    # return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
-    return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
+    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    # return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
@@ -205,29 +205,29 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.file_format=parquet',
+                     f'spark.nyec.iqvia.file_format=csv',
 
                      '--conf',
                      f'spark.executor.memory=50g',
 
                      '--conf',
-                     f'spark.executor.cores=34',
+                     f'spark.executor.cores=35',
 
                      '--conf',
-                     f'spark.sql.shuffle.partitions=10000',
+                     f'spark.sql.shuffle.partitions=6000',
 
                      '--conf',
-                     f'spark.driver.memory=12G',
+                     f'spark.driver.memory=16G',
 
                      '--conf',
-                     f'spark.driver.cores=2',
+                     f'spark.driver.cores=4',
 
                      '--conf',
                      f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -XX:OnOutOfMemoryError=\'kill -9 %p\'',
                      # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
 
                      '--conf',
-                     f'num-executors=10',
+                     f'num-executors=4',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',

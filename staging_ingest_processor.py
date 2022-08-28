@@ -30,6 +30,26 @@ spark = SparkSession \
 conf = spark.conf
 sqlContext = SQLContext(spark)
 
+# rdd=spark.sparkContext.parallelize([Row(pat_id=0,code='r1', name='name_1'),
+#                                     Row(pat_id=0,code='r2', name='name_1'),
+#                                     Row(pat_id=1,code='r1', name='name_2'),
+#                                     Row(pat_id=1,code='r2', name='name_2'),
+#                                     Row(pat_id=2,code='r1', name='name_3'),
+#                                     Row(pat_id=2,code='r3', name='name_3'),
+#                                     Row(pat_id=3,code='r4', name='name_3'),
+#                                     ])
+# # rdd1 = rdd.keyBy(lambda r: r.pat_id)
+# # rdd1.glom().collect()
+# # rdd2 = rdd1.partitionBy(5, lambda k: k)
+# # rdd2.glom().collect()
+# rdd3 = rdd.keyBy(lambda r: (r.pat_id, r.code))
+# # rdd3 = rdd.keyBy(lambda t: ((t[1].pat_id, t[1].code)))
+# # rdd3 = rdd2.map(lambda t: ((t[1].pat_id, t[1].code), t[1]))
+# rdd3.glom().collect()
+# rdd4 = rdd3.repartitionAndSortWithinPartitions(5, lambda t: t[0])
+# rdd4.glom().collect()
+
+
 start = datetime.now()
 plan_path = conf.get("spark.nyec.iqvia.raw_plan_ingest_path")
 patient_path = conf.get("spark.nyec.iqvia.raw_patient_ingest_path")
@@ -70,18 +90,18 @@ raw_plan_df = load_plan(spark, plan_path, raw_plan_schema, file_format)\
 
 raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_format) \
     .withColumn('PATIENT_SALT', (100*rand()).cast(IntegerType()))\
-    .repartition(12000, 'PATIENT_ID') \
+    .repartition(6000, 'PATIENT_ID') \
     .sortWithinPartitions('PATIENT_ID') \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 # .withColumn('SALT', (10*rand()).cast(IntegerType()))\
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
     .withColumn('CLAIM_SALT', (100*rand()).cast(IntegerType()))\
-    .repartition(12000, 'PATIENT_ID_CLAIM') \
+    .repartition(6000, 'PATIENT_ID_CLAIM') \
     .sortWithinPartitions('PATIENT_ID_CLAIM') \
     .persist(StorageLevel.MEMORY_AND_DISK)
 # .limit(10 * 1000 * 1000)\
-raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)\
+raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
 
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format)
 provider_raw = load_provider(spark, provider_path, raw_provider_schema, file_format).select(col('PROVIDER_ID'),
@@ -133,6 +153,7 @@ proc_cache = dict([(row["PRC_CD"] + ':' + row["PRC_VERS_TYP_ID"], row.asDict()) 
 
 ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache,
              PLAN: plan_cache}
+
 print('------------------------>>>>>>> broadcasting reference data')
 broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 
@@ -171,14 +192,15 @@ patient_claims_raw_rdd = raw_patient_df \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
-# raw_claim_df.repartition(col('PATIENT_ID_CLAIM')).sortWithinPartitions(col('PATIENT_ID_CLAIM')).show(1)
 
 ### create procedure
-currated_df = to_procedure(patient_claims_raw_rdd, ref_lookup) #.persist(StorageLevel.MEMORY_AND_DISK)
-# save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
-# save_procedure_modifiers(procedure_rdd, generate_output_path('proceduremodifier'))
+patient_claims_raw_rdd.first() #TODO: delete
 
-# currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
+procedure_rdd = to_procedure(patient_claims_raw_rdd, ref_lookup) #.persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
+save_procedure_modifiers(procedure_rdd, generate_output_path('proceduremodifier'))
+
+currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_procedure(currated_df, generate_output_path('procedure'))
 currated_df.unpersist(False)
 # procedure_rdd.unpersist(False)
