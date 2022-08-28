@@ -139,7 +139,7 @@ def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -
 
 
 def get_code_system(code_system_version: str, code_system_type: str):
-    result = to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
+    return to_standard_code_system(code_system_version, code_system_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
 
 
 plan_cache = dict([(row['IMS_PLN_ID'], row.asDict()) for row in plan_list])
@@ -147,9 +147,10 @@ drug_cache = dict([(row['NDC_CD'], row.asDict()) for row in drug_list])
 provider_cache = dict([(row['PROVIDER_ID'], row.asDict()) for row in provider_list])
 problem_cache = dict(
     [(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC']))
-     for row in problem_list])
+     for row in problem_list if get_code_system(row["DIAG_VERS_TYP_ID"], '') is not None])
 
-proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']), row.asDict()) for row in proc_list if get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']) is not None])
+proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']), row.asDict())
+                   for row in proc_list if get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']) is not None])
 
 ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache,
              PLAN: plan_cache}
@@ -184,18 +185,18 @@ print('------------------------>>>>>>> saved patient <<<--- ')
 
 # raw_claim_df.CLAIM_SALT == raw_patient_df.PATIENT_SALT
 ### create clinical events
-patient_claims_raw_rdd = raw_patient_df \
+patient_claims_raw_df = raw_patient_df \
     .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
-    .rdd \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
 ### create procedure
-patient_claims_raw_rdd.first() #TODO: delete
-
+print(f'------------------------>>>>>>> patient_claims_raw_df.first: {patient_claims_raw_df.first()}')
+patient_claims_raw_rdd = patient_claims_raw_df.rdd.persist(StorageLevel.MEMORY_AND_DISK)
+print(f'------------------------>>>>>>> patient_claims_raw_rdd.first: {patient_claims_raw_df.first()}')
 procedure_rdd = to_procedure(patient_claims_raw_rdd, ref_lookup) #.persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
 save_procedure_modifiers(procedure_rdd, generate_output_path('proceduremodifier'))

@@ -217,6 +217,9 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.sql.shuffle.partitions=6000',
 
                      '--conf',
+                     f'spark.sql.files.maxPartitionBytes=268435456',
+
+                     '--conf',
                      f'spark.driver.memory=16G',
 
                      '--conf',
