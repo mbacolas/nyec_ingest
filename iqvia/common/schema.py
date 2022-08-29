@@ -233,7 +233,7 @@ raw_org_schema = StructType([
     StructField("source_org_oid", StringType()),
     StructField("name", StringType()),
     StructField("type", StringType()),
-    StructField("active", StringType()),
+    StructField("active", BooleanType()),
     StructField("batch_id", StringType()),
     StructField("date_created", DateType())
 ])
@@ -272,7 +272,7 @@ stage_patient_schema = StructType([
     StructField("source_consumer_id", StringType()),
     StructField("source_org_oid", StringType()),
     StructField("type", StringType()),
-    StructField("active", StringType()),
+    StructField("active", BooleanType()),
     StructField("dob_raw", StringType()),
     StructField("dob", DateType()),
     StructField("gender_raw", StringType()),
@@ -394,7 +394,7 @@ stage_provider_schema = StructType([
     StructField("role", StringType()),
     StructField("claim_identifier", StringType()),
     StructField("service_number", StringType()),
-    StructField("active", StringType()),
+    StructField("active", BooleanType()),
     StructField("error", ArrayType(StringType())),
     StructField("warning", ArrayType(StringType())),
     StructField("is_valid", BooleanType()),
@@ -417,6 +417,6 @@ curated_ingest_run_schema = StructType([
     StructField("batch_id", StringType()),
     StructField("file_paths", StringType()),
     StructField("duration", StringType()),
-    StructField("start_time", StringType()),
-    StructField("end_time", StringType())
+    StructField("start_time", DateType()),
+    StructField("end_time", DateType())
 ])

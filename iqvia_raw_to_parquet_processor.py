@@ -12,6 +12,17 @@ spark = SparkSession.builder \
 
 conf = spark.conf
 
+
+def generate_batch_id():
+    from datetime import date
+    curr_dt = date.today()
+    curr_year = curr_dt.year
+    curr_month = curr_dt.month
+    curr_day = curr_dt.day
+
+    return f'{curr_year}{curr_month}{curr_day}'
+
+
 file_parsing_delimiter = conf.get("spark.nyec.file_delimiter", '|')
 
 plan_load_path = conf.get("spark.nyec.iqvia.raw_plan_ingest_path")
@@ -23,7 +34,8 @@ diagnosis_load_path = conf.get("spark.nyec.iqvia.raw_diagnosis_ingest_path")
 drug_load_path = conf.get("spark.nyec.iqvia.raw_drug_ingest_path")
 provider_load_path = conf.get("spark.nyec.iqvia.raw_provider_ingest_path")
 pro_provider_load_path = conf.get("spark.nyec.iqvia.raw_pro_provider_ingest_path")
-batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
+batch_id = conf.get("spark.nyec.iqvia.batch_id", generate_batch_id())
+# batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
 date_created = datetime.now()
 iqvia_processed_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_processed_s3_prefix")
 

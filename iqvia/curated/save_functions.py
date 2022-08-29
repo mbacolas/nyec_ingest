@@ -19,7 +19,7 @@ def save_errors(rdd: RDD, row_type: str, output_path: str):
                            date_created=r.date_created)) \
         .toDF(error_schema) \
         .write\
-        .parquet(output_path, mode='overwrite', compression='snappy')
+        .parquet(output_path, mode='append', compression='snappy')
 
         # .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
     # rdd.filter(lambda r: r.is_included == False) \
@@ -118,8 +118,7 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
 
 
 def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str):
-    currated_procedure_mods_rdd.filter(lambda r: r.is_valid == False)\
-                                .filter(lambda r: len(r.mod) > 0)\
+    currated_procedure_mods_rdd.filter(lambda r: r.is_valid == False and len(r.mod) > 0)\
                                 .flatMap(lambda r: map(lambda y: Row(id=r.id,
                                                                      source_org_oid=r.source_org_oid,
                                                                      source_consumer_id=r.source_consumer_id,
@@ -131,11 +130,12 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
                                                                      batch_id=r.batch_id,
                                                                      date_created=r.date_created), r.mod))\
                                 .toDF(stage_procedure__modifier_schema) \
-                                .repartition(col('source_consumer_id')) \
-                                .sortWithinPartitions(6000, col('source_consumer_id'),
+                                .repartition(6000, col('source_consumer_id')) \
+                                .sortWithinPartitions(col('source_consumer_id'),
                                                       col('code_system'),
                                                       col('code'),
-                                                      col('start_date')) \
+                                                      col('mod'
+                                                          '')) \
                                 .write\
                                 .parquet(output_path, mode='overwrite', compression='snappy')
 
@@ -250,7 +250,8 @@ def save_claim(currated_claim_df: DataFrame, output_path: str):
 
 
 def save_provider(currated_provider_df: DataFrame, output_path: str):
-    currated_provider_df.filter(currated_provider_df.is_valid == True) \
+    currated_provider_df\
+        .filter(currated_provider_df.is_valid == True) \
         .select(col('id'),
                 col('npi'),
                 col('source_org_oid'),

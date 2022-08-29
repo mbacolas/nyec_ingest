@@ -7,6 +7,7 @@ from pyspark.sql.functions import col
 from pymonad.either import *
 # from staging_ingest_processor import ref_lookup
 from pyspark import StorageLevel
+from iqvia.common.schema import *
 
 RENDERING = 'RENDERING'
 REFERRING = 'REFERRING'
@@ -19,6 +20,7 @@ COST = 'COST'
 CLAIM = 'CLAIM'
 PRACTIONER = 'PRACTIONER'
 PLAN = 'PLAN'
+
 
 # def ref_lookup(event_type: str, key: str):
 #     return broadcast_cache.value[event_type].get(key, {})
@@ -35,8 +37,8 @@ def extract_left(*result: Either):
 
     for r in result:
         if r is None:
-            error = {'error': f'Value ois None'}
-            error.append(error)
+            error = {'error': f'Value is None'}
+            error.append(json.dumps(error))
         elif r.is_left():
             error.append(r.either(lambda x: x, lambda x: x))
     return error
@@ -58,7 +60,8 @@ def validate_provider_type(provider_type: str) -> Either:
     elif provider_type == '2':
         return Right('ORGANIZATION')
     else:
-        error = {'source_column_name': 'PROVIDER_TYP_ID', 'error': f'invalid PROVIDER_TYP_ID', 'source_column_value': provider_type}
+        error = {'source_column_name': 'PROVIDER_TYP_ID', 'error': f'invalid PROVIDER_TYP_ID',
+                 'source_column_value': provider_type}
         return Left(json.dumps(error))
 
 
@@ -68,7 +71,7 @@ def to_standard_code_system(version_id: str, type_cd: str, source_column_name) -
         return Right('ICD10')
     elif version_id == '1':
         return Right('ICD9')
-    elif version_id == '-1' and type_cd=='C':
+    elif version_id == '-1' and type_cd == 'C':
         return Right('CPT')
     elif version_id == '-1' and type_cd == 'H':
         return Right('HCPCS')
@@ -85,12 +88,13 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
 
     cached_proc = ref_lookup(PROCEDURE, claim_row.PRC_CD + ':' + claim_row.PRC_VERS_TYP_ID)
     code_system = cached_proc.get('PRC_TYP_CD', None)
-    all_code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, code_system, 'PRC_VERS_TYP_ID:PRC_TYP_CD')
+    all_code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, code_system,
+                                                     'PRC_VERS_TYP_ID:PRC_TYP_CD')
 
     proc_code_result = get_code(claim_row.PRC_CD, all_code_system_result.value, 'PRC_CD')
     rev_code_result = get_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
-    proc_code=extract_code(proc_code_result)
-    rev_code=extract_code(rev_code_result)
+    proc_code = extract_code(proc_code_result)
+    rev_code = extract_code(rev_code_result)
     validation_errors = extract_left(*[all_code_system_result,
                                        start_date_result,
                                        to_date_result,
@@ -135,20 +139,39 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
                    salt=claim_row.PATIENT_SALT)
     return proc_row
 
+
 # .keyBy(lambda r: (r.patient_salt, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 #     .partitionBy(5000, lambda k: int(k[0])) \
 #     .reduceByKey((lambda a, b: a)) \
 #     .map(lambda r: r[1]) \
 
+def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
+    return claim_rdd \
+        .filter(lambda r: r.PRC_CD is not None) \
+        .map(lambda r: _to_procedure_row(r, ref_lookup)) \
+        .toDF(stage_procedure_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'start_date',
+                     'code_raw',
+                     'code_system_raw') \
+        .sortWithinPartitions('source_consumer_id',
+                              'start_date',
+                              'code_raw',
+                              'code_system_raw') \
+        .dropDuplicates(['source_consumer_id',
+                         'start_date',
+                         'code_raw',
+                         'code_system_raw'])
 
-def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
-    return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
-                    .map(lambda r: _to_procedure_row(r, ref_lookup)) \
-                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                    .reduceByKey((lambda a, b: a)) \
-                    .map(lambda r: r[1]) \
-                    .persist(StorageLevel.MEMORY_AND_DISK)
+
+# def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
+#     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
+#                     .map(lambda r: _to_procedure_row(r, ref_lookup)) \
+#                     .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+#                     .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+#                     .reduceByKey((lambda a, b: a)) \
+#                     .map(lambda r: r[1]) \
+#                     .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
@@ -165,7 +188,8 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
-    source_desc = ref_lookup(PROBLEM, f'{diag_code.get("code", None)}:{diag_code.get("code_system", None)}').get('DIAG_SHORT_DESC', None)
+    source_desc = ref_lookup(PROBLEM, f'{diag_code.get("code", None)}:{diag_code.get("code_system", None)}').get(
+        'DIAG_SHORT_DESC', None)
 
     diag_row = Row(id=uuid.uuid4().hex[:12],
                    primary=None,
@@ -198,16 +222,34 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     return diag_row
 
 
-def to_problem(claim_rdd: RDD, ref_lookup) -> RDD:
-    return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
-                    .map(lambda r: _to_problem_row(r, ref_lookup))\
-                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                    .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1]) \
-                    .persist(StorageLevel.MEMORY_AND_DISK)
-                    # .partitionBy(12000, lambda k: int(k[0])) \
-                    # .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+def to_problem(claim_rdd: RDD, ref_lookup) -> DataFrame:
+    return claim_rdd \
+        .map(lambda r: _to_problem_row(r, ref_lookup)) \
+        .toDF(stage_problem_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'start_date',
+                     'code_raw',
+                     'code_system_raw') \
+        .sortWithinPartitions('source_consumer_id',
+                              'start_date',
+                              'code_raw',
+                              'code_system_raw') \
+        .dropDuplicates(['source_consumer_id',
+                         'start_date',
+                         'code_raw',
+                         'code_system_raw'])
+
+
+# def to_problem(claim_rdd: RDD, ref_lookup) -> RDD:
+#     return claim_rdd.filter(lambda r: r.DIAG_CD is not None)\
+#                     .map(lambda r: _to_problem_row(r, ref_lookup))\
+#                     .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+#                     .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+#                     .reduceByKey((lambda a, b: a))\
+#                     .map(lambda r: r[1]) \
+#                     .persist(StorageLevel.MEMORY_AND_DISK)
+# .partitionBy(12000, lambda k: int(k[0])) \
+# .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
 
 
 def _to_admitting_diagnosis(claim_row: Row) -> Row:
@@ -254,14 +296,32 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     return diag_row
 
 
-def to_admitting_diagnosis(claim_rdd: RDD) -> RDD:
-    return claim_rdd.filter(lambda r: r.ADMS_DIAG_CD is not None)\
-                    .map(lambda r: _to_admitting_diagnosis(r))\
-                    .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                    .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])\
-                    .persist(StorageLevel.MEMORY_AND_DISK)
+def to_admitting_diagnosis(claim_rdd: RDD) -> DataFrame:
+    return claim_rdd.filter(lambda r: r.ADMS_DIAG_CD is not None) \
+        .map(lambda r: _to_admitting_diagnosis(r)) \
+        .toDF(stage_problem_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'start_date',
+                     'code_raw',
+                     'code_system_raw') \
+        .sortWithinPartitions('source_consumer_id',
+                              'start_date',
+                              'code_raw',
+                              'code_system_raw') \
+        .dropDuplicates(['source_consumer_id',
+                         'start_date',
+                         'code_raw',
+                         'code_system_raw'])
+
+
+# def to_admitting_diagnosis(claim_rdd: RDD) -> RDD:
+#     return claim_rdd.filter(lambda r: r.ADMS_DIAG_CD is not None) \
+#         .map(lambda r: _to_admitting_diagnosis(r)) \
+#         .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+#         .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+#         .reduceByKey((lambda a, b: a)) \
+#         .map(lambda r: r[1]) \
+#         .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_drug_row(claim_row: Row, ref_lookup) -> Row:
@@ -320,16 +380,33 @@ def _to_drug_row(claim_row: Row, ref_lookup) -> Row:
                    date_created=claim_row.date_created)
     return drug_row
 
-
-def to_drug(claim_rdd: RDD, ref_lookup) -> RDD:
+def to_drug(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd \
         .filter(lambda r: r.NDC_CD is not None) \
-        .map(lambda r: _to_drug_row(r, ref_lookup))\
-        .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-        .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-        .reduceByKey((lambda a, b: a))\
-        .map(lambda r: r[1])\
-        .persist(StorageLevel.MEMORY_AND_DISK)
+        .map(lambda r: _to_drug_row(r, ref_lookup)) \
+        .toDF(stage_drug_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'start_date',
+                     'code_raw',
+                     'code_system_raw') \
+        .sortWithinPartitions('source_consumer_id',
+                              'start_date',
+                              'code_raw',
+                              'code_system_raw') \
+        .dropDuplicates(['source_consumer_id',
+                         'start_date',
+                         'code_raw',
+                         'code_system_raw'])
+
+# def to_drug(claim_rdd: RDD, ref_lookup) -> RDD:
+#     return claim_rdd \
+#         .filter(lambda r: r.NDC_CD is not None) \
+#         .map(lambda r: _to_drug_row(r, ref_lookup)) \
+#         .keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
+#         .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+#         .reduceByKey((lambda a, b: a)) \
+#         .map(lambda r: r[1]) \
+#         .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def is_inpatient(hosp_admt_dt: str):
@@ -380,14 +457,18 @@ def _to_patient_row(patient_plan: Row) -> Row:
     return patient_row
 
 
-def to_patient(patient_plan_rdd: RDD) -> RDD:
-    return patient_plan_rdd\
-                        .map(lambda r: _to_patient_row(r))\
-                        .keyBy(lambda r: (r.source_consumer_id)) \
-                        .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                        .reduceByKey((lambda a, b: a))\
-                        .map(lambda r: r[1])\
-                        .persist(StorageLevel.MEMORY_AND_DISK)
+def to_patient(patient_plan_rdd: RDD) -> DataFrame:
+    return patient_plan_rdd \
+        .map(lambda r: _to_patient_row(r)) \
+        .toDF(stage_patient_schema) \
+        .repartition(6000, col('source_consumer_id')) \
+        .sortWithinPartitions('source_consumer_id') \
+        .dropDuplicates(['source_consumer_id']) \
+        # .persist(StorageLevel.MEMORY_AND_DISK)
+    # .keyBy(lambda r: (r.source_consumer_id)) \
+    # .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+    # .reduceByKey((lambda a, b: a))\
+    # .map(lambda r: r[1])\
 
 
 # rdd = sc.parallelize([(0, 5), (3, 8), (2, 6), (0, 8), (3, 8), (1, 3)])
@@ -416,7 +497,7 @@ def to_patient(patient_plan_rdd: RDD) -> RDD:
 
 
 def _to_eligibility_row(patient_plan_rdd: Row) -> Row:
-    pass #TODO: not data to implement
+    pass  # TODO: not data to implement
 
 
 def to_eligibility(patient_plan_rdd: RDD) -> RDD:
@@ -430,35 +511,52 @@ def _to_cost_row(claim_row: Row) -> Row:
     validation_warnings = []
     warn = False
     cost_row = Row(id=uuid.uuid4().hex[:12],
-                    co_payment=None,
-                    deductible_amount=None,
-                    coinsurance=None,
-                    covered_amount=None,
-                    allowed_amount=None,
-                    not_covered_amount=None,
-                    source_consumer_id=claim_row.PATIENT_ID,
-                    source_org_oid=claim_row.source_org_oid,
-                    claim_identifier=claim_row.CLAIM_ID,
-                    service_number=claim_row.SVC_NBR,
-                    paid_amount_raw=claim_row.SVC_CRGD_AMT,
-                    paid_amount=paid_amount_result.value,
-                    error=validation_errors,
-                    warning=validation_warnings,
-                    is_valid=valid,
-                    has_warnings=warn,
-                    batch_id=claim_row.batch_id,
-                    date_created=claim_row.date_created)
+                   co_payment=None,
+                   deductible_amount=None,
+                   coinsurance=None,
+                   covered_amount=None,
+                   allowed_amount=None,
+                   not_covered_amount=None,
+                   source_consumer_id=claim_row.PATIENT_ID,
+                   source_org_oid=claim_row.source_org_oid,
+                   claim_identifier=claim_row.CLAIM_ID,
+                   service_number=claim_row.SVC_NBR,
+                   paid_amount_raw=claim_row.SVC_CRGD_AMT,
+                   paid_amount=paid_amount_result.value,
+                   error=validation_errors,
+                   warning=validation_warnings,
+                   is_valid=valid,
+                   has_warnings=warn,
+                   batch_id=claim_row.batch_id,
+                   date_created=claim_row.date_created)
     return cost_row
 
 
-def to_cost(claim_row_rdd: RDD) -> RDD:
-    return claim_row_rdd\
-                    .map(lambda r: _to_cost_row(r)) \
-                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier, r.service_number, r.paid_amount)) \
-                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                    .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])\
-                    .persist(StorageLevel.MEMORY_AND_DISK)
+def to_cost(claim_row_rdd: RDD) -> DataFrame:
+    return claim_row_rdd \
+        .map(lambda r: _to_cost_row(r)) \
+        .toDF(stage_cost_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'claim_identifier',
+                     'service_number',
+                     'paid_amount') \
+        .sortWithinPartitions('source_consumer_id',
+                              'claim_identifier',
+                              'service_number',
+                              'paid_amount') \
+        .dropDuplicates(['source_consumer_id',
+                         'claim_identifier',
+                         'service_number',
+                         'paid_amount'])
+
+# def to_cost(claim_row_rdd: RDD) -> RDD:
+#     return claim_row_rdd \
+#         .map(lambda r: _to_cost_row(r)) \
+#         .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier, r.service_number, r.paid_amount)) \
+#         .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+#         .reduceByKey((lambda a, b: a)) \
+#         .map(lambda r: r[1]) \
+#         .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
@@ -466,7 +564,7 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', is_required=False)
     admission_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT', is_required=False)
-    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', is_required=False) #should be True
+    discharge_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT', is_required=False)  # should be True
     facility_type_cd_result = validate_facility_type_cd(claim_row.FCLT_TYP_CD)
     admission_source_cd_result = validate_admission_source_cd(claim_row.ADMS_SRC_CD)
     admission_type_cd_result = validate_admission_type_cd(claim_row.ADMS_TYP_CD)
@@ -474,9 +572,9 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
 
     if admission_date_result.value is not None:
         validation_warnings = extract_left(*[source_claim_type,
-                                           facility_type_cd_result,
-                                           admission_source_cd_result,
-                                           admission_type_cd_result])
+                                             facility_type_cd_result,
+                                             admission_source_cd_result,
+                                             admission_type_cd_result])
     else:
         validation_warnings = extract_left(*[source_claim_type])
     valid = is_record_valid(validation_errors)
@@ -489,55 +587,66 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     #  'IMS_PBM_ADJUDICATING_NM': 'OPTUMRX (PROC UNSPEC)', 'org_type': 'THIRD PARTY CLAIMS AGGREGATOR',
     #  'plan_status': True}
     claim_stage_row = Row(id=uuid.uuid4().hex[:12],
-                           source_consumer_id=claim_row.PATIENT_ID,
-                            source_org_oid=claim_row.source_org_oid,
-                            payer_name=cached_plan.get('IMS_PAYER_NM', None),
-                            # payer_name=claim_row.IMS_PAYER_NM,
-                            payer_id=cached_plan.get('IMS_PLN_ID', None),
-                            # payer_id=claim_row.IMS_PLN_ID,
-                            plan_name=cached_plan.get('IMS_PLN_NM', None),
-                            # plan_name=claim_row.IMS_PLN_NM,
-                            plan_id=claim_row.PLAN_ID,
-                            claim_identifier=claim_row.CLAIM_ID,
-                            service_number=claim_row.SVC_NBR,
-                            type_raw=claim_row.CLAIM_TYP_CD,
-                            type=source_claim_type.value,
-                            sub_type_raw=claim_row.HOSP_ADMT_DT,
-                            sub_type=is_inpatient(claim_row.HOSP_ADMT_DT),
-                            start_date_raw=claim_row.SVC_FR_DT,
-                            start_date=start_date_result.value,
-                            end_date_raw=claim_row.SVC_TO_DT,
-                            end_date=to_date_result.value,
-                            admission_date_raw=claim_row.HOSP_ADMT_DT,
-                            admission_date=admission_date_result.value,
-                            discharge_date_raw=claim_row.HOSP_DISCHG_DT,
-                            discharge_date=discharge_date_result.value,
-                            units_of_service_raw=claim_row.UNIT_OF_SVC_AMT,
-                            units_of_service=claim_row.UNIT_OF_SVC_AMT,
-                            facility_type_cd_raw=claim_row.FCLT_TYP_CD,
-                            facility_type_cd=claim_row.FCLT_TYP_CD,
-                            admission_source_cd_raw=claim_row.ADMS_SRC_CD,
-                            admission_source_cd=claim_row.ADMS_SRC_CD,
-                            admission_type_cd_raw=claim_row.ADMS_TYP_CD,
-                            admission_type_cd=claim_row.ADMS_TYP_CD,
-                            place_of_service_raw=claim_row.PLACE_OF_SVC_NM,
-                            place_of_service=claim_row.PLACE_OF_SVC_NM,
-                            error=validation_errors,
-                            warning=validation_warnings,
-                            is_valid=valid,
-                            has_warnings=warn,
-                            batch_id=claim_row.batch_id,
-                            date_created=claim_row.date_created)
+                          source_consumer_id=claim_row.PATIENT_ID,
+                          source_org_oid=claim_row.source_org_oid,
+                          payer_name=cached_plan.get('IMS_PAYER_NM', None),
+                          # payer_name=claim_row.IMS_PAYER_NM,
+                          payer_id=cached_plan.get('IMS_PLN_ID', None),
+                          # payer_id=claim_row.IMS_PLN_ID,
+                          plan_name=cached_plan.get('IMS_PLN_NM', None),
+                          # plan_name=claim_row.IMS_PLN_NM,
+                          plan_id=claim_row.PLAN_ID,
+                          claim_identifier=claim_row.CLAIM_ID,
+                          service_number=claim_row.SVC_NBR,
+                          type_raw=claim_row.CLAIM_TYP_CD,
+                          type=source_claim_type.value,
+                          sub_type_raw=claim_row.HOSP_ADMT_DT,
+                          sub_type=is_inpatient(claim_row.HOSP_ADMT_DT),
+                          start_date_raw=claim_row.SVC_FR_DT,
+                          start_date=start_date_result.value,
+                          end_date_raw=claim_row.SVC_TO_DT,
+                          end_date=to_date_result.value,
+                          admission_date_raw=claim_row.HOSP_ADMT_DT,
+                          admission_date=admission_date_result.value,
+                          discharge_date_raw=claim_row.HOSP_DISCHG_DT,
+                          discharge_date=discharge_date_result.value,
+                          units_of_service_raw=claim_row.UNIT_OF_SVC_AMT,
+                          units_of_service=claim_row.UNIT_OF_SVC_AMT,
+                          facility_type_cd_raw=claim_row.FCLT_TYP_CD,
+                          facility_type_cd=claim_row.FCLT_TYP_CD,
+                          admission_source_cd_raw=claim_row.ADMS_SRC_CD,
+                          admission_source_cd=claim_row.ADMS_SRC_CD,
+                          admission_type_cd_raw=claim_row.ADMS_TYP_CD,
+                          admission_type_cd=claim_row.ADMS_TYP_CD,
+                          place_of_service_raw=claim_row.PLACE_OF_SVC_NM,
+                          place_of_service=claim_row.PLACE_OF_SVC_NM,
+                          error=validation_errors,
+                          warning=validation_warnings,
+                          is_valid=valid,
+                          has_warnings=warn,
+                          batch_id=claim_row.batch_id,
+                          date_created=claim_row.date_created)
     return claim_stage_row
 
 
-def to_claim(claim_raw: RDD, ref_lookup) -> RDD:
-    return claim_raw.map(lambda r: _to_claim_row(r, ref_lookup))\
-                    .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier)) \
-                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                    .reduceByKey((lambda a, b: a))\
-                    .map(lambda r: r[1])\
-                    .persist(StorageLevel.MEMORY_AND_DISK)
+def to_claim(claim_raw: RDD, ref_lookup) -> DataFrame:
+    return claim_raw\
+        .map(lambda r: _to_claim_row(r, ref_lookup)) \
+        .toDF(stage_claim_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'claim_identifier') \
+        .sortWithinPartitions('source_consumer_id',
+                              'claim_identifier') \
+        .dropDuplicates(['source_consumer_id',
+                         'claim_identifier'])
+
+# def to_claim(claim_raw: RDD, ref_lookup) -> RDD:
+#     return claim_raw.map(lambda r: _to_claim_row(r, ref_lookup)) \
+#         .keyBy(lambda r: (r.source_org_oid, r.source_consumer_id, r.claim_identifier)) \
+#         .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
+#         .reduceByKey((lambda a, b: a)) \
+#         .map(lambda r: r[1]) \
+#         .persist(StorageLevel.MEMORY_AND_DISK)
 
 
 def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
@@ -551,11 +660,14 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
         validation_errors = []
         validation_warnings = extract_left(*[source_provider_type_result])
         valid = is_record_valid(validation_errors)
-        validation_warnings =  is_record_valid(validation_warnings)
-        warn = not validation_warnings
+        warn = not is_record_valid(validation_warnings)
 
         if npi is None:
-            warn.append()
+            warn = True
+            error = {'error': f'NPI is None',
+                     'source_column_value': 'None',
+                     'source_column_name': 'NPI'}
+            validation_warnings.append(json.dumps(error))
 
         # {'PROVIDER_ID': '10151134',
         #  'PROVIDER_TYP_ID': '1',
@@ -569,74 +681,83 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
         rendering_provider_row = Row(id=uuid.uuid4().hex[:12],
                                      npi=cached_provider.get('NPI', None),
                                      # npi=claim_row.RENDERING_NPI,
-                                    source_org_oid=claim_row.source_org_oid,
-                                    first_name=cached_provider.get('FIRST_NM', None),
-                                    # first_name=claim_row.RENDERING_FIRST_NM,
-                                    last_name=cached_provider.get('LAST_NM', None),
-                                    # last_name=claim_row.RENDERING_LAST_NM,
-                                    source_provider_id=claim_row.RENDERING_PROVIDER_ID,
-                                    provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
-                                    # provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
-                                    provider_type=source_provider_type_result.value,
-                                    role=RENDERING,
-                                    claim_identifier=claim_row.CLAIM_ID,
-                                    service_number=claim_row.SVC_NBR,
-                                    active=True,
-                                    error=validation_errors,
-                                    warning=validation_warnings,
-                                    is_valid=valid,
-                                    has_warnings=warn,
-                                    batch_id=claim_row.batch_id,
-                                    date_created=claim_row.date_created)
+                                     source_org_oid=claim_row.source_org_oid,
+                                     first_name=cached_provider.get('FIRST_NM', None),
+                                     # first_name=claim_row.RENDERING_FIRST_NM,
+                                     last_name=cached_provider.get('LAST_NM', None),
+                                     # last_name=claim_row.RENDERING_LAST_NM,
+                                     source_provider_id=claim_row.RENDERING_PROVIDER_ID,
+                                     provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
+                                     # provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
+                                     provider_type=source_provider_type_result.value,
+                                     role=RENDERING,
+                                     claim_identifier=claim_row.CLAIM_ID,
+                                     service_number=claim_row.SVC_NBR,
+                                     active=True,
+                                     error=validation_errors,
+                                     warning=validation_warnings,
+                                     is_valid=valid,
+                                     has_warnings=warn,
+                                     batch_id=claim_row.batch_id,
+                                     date_created=claim_row.date_created)
         providers.append(rendering_provider_row)
 
     if claim_row.REFERRING_PROVIDER_ID is not None:
         cached_provider = ref_lookup(PRACTIONER, claim_row.REFERRING_PROVIDER_ID)
         source_provider_type_result = validate_provider_type(cached_provider.get('PROVIDER_TYP_ID', None))
         # source_provider_type_result = validate_provider_type(claim_row.REFERRING_PROVIDER_TYP_ID)
-        validation_errors = extract_left(*[source_provider_type_result])
+        validation_errors = []
+        validation_warnings = extract_left(*[source_provider_type_result])
         valid = is_record_valid(validation_errors)
-        validation_warnings = []
-        warn = False
+        warn = not is_record_valid(validation_warnings)
+
+        if npi is None:
+            warn = True
+            error = {'error': f'NPI is None',
+                     'source_column_value': 'None',
+                     'source_column_name': 'NPI'}
+            validation_warnings.append(json.dumps(error))
+
         ref_provider_row = Row(id=uuid.uuid4().hex[:12],
-                                     npi=cached_provider.get('NPI', None),
-                                     # npi=claim_row.RENDERING_NPI,
-                                    source_org_oid=claim_row.source_org_oid,
-                                    first_name=cached_provider.get('FIRST_NM', None),
-                                    # first_name=claim_row.RENDERING_FIRST_NM,
-                                    last_name=cached_provider.get('FIRST_NM', None),
-                                    # last_name=claim_row.RENDERING_LAST_NM,
-                                    source_provider_id=claim_row.RENDERING_PROVIDER_ID,
-                                    provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
-                                    # provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
-                                    provider_type=source_provider_type_result.value,
-                                    role=RENDERING,
-                                    claim_identifier=claim_row.CLAIM_ID,
-                                    service_number=claim_row.SVC_NBR,
-                                    active=True,
-                                    error=validation_errors,
-                                    warning=validation_warnings,
-                                    is_valid=valid,
-                                    has_warnings=warn,
-                                    batch_id=claim_row.batch_id,
-                                    date_created=claim_row.date_created)
+                               npi=cached_provider.get('NPI', None),
+                               # npi=claim_row.RENDERING_NPI,
+                               source_org_oid=claim_row.source_org_oid,
+                               first_name=cached_provider.get('FIRST_NM', None),
+                               # first_name=claim_row.RENDERING_FIRST_NM,
+                               last_name=cached_provider.get('FIRST_NM', None),
+                               # last_name=claim_row.RENDERING_LAST_NM,
+                               source_provider_id=claim_row.RENDERING_PROVIDER_ID,
+                               provider_type_raw=cached_provider.get('PROVIDER_TYP_ID', None),
+                               # provider_type_raw=claim_row.REFERRING_PROVIDER_TYP_ID,
+                               provider_type=source_provider_type_result.value,
+                               role=RENDERING,
+                               claim_identifier=claim_row.CLAIM_ID,
+                               service_number=claim_row.SVC_NBR,
+                               active=True,
+                               error=validation_errors,
+                               warning=validation_warnings,
+                               is_valid=valid,
+                               has_warnings=warn,
+                               batch_id=claim_row.batch_id,
+                               date_created=claim_row.date_created)
         providers.append(ref_provider_row)
 
     return providers
 
 
-def to_practitioner(claim_rdd: RDD, ref_lookup) -> RDD:
-    return claim_rdd.flatMap(lambda r: _to_practitioner_row(r, ref_lookup)).persist(StorageLevel.MEMORY_AND_DISK)
-                    # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
+def to_practitioner(claim_rdd: RDD, ref_lookup) -> DataFrame:
+    return claim_rdd\
+        .flatMap(lambda r: _to_practitioner_row(r, ref_lookup))\
+        .toDF(stage_provider_schema)
+    # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
 
 
 def to_practitioner_role(practitioner_df: DataFrame) -> DataFrame:
     return practitioner_df.select(col('npi'),
-                                   col('source_provider_id'),
-                                   col('claim_identifier'),
-                                   col('service_number'),
-                                   col('role'),
-                                   col('is_valid'),
-                                   col('batch_id'),
-                                   col('date_created'))\
-            .persist(StorageLevel.MEMORY_AND_DISK)
+                                  col('source_provider_id'),
+                                  col('claim_identifier'),
+                                  col('service_number'),
+                                  col('role'),
+                                  col('is_valid'),
+                                  col('batch_id'),
+                                  col('date_created'))
