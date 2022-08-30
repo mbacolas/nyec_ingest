@@ -106,8 +106,8 @@ raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_form
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 # .withColumn('SALT', (10*rand()).cast(IntegerType()))\
+# .limit(10 * 1000 * 1000)\
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
-    .limit(10 * 1000 * 1000)\
     .withColumn('CLAIM_SALT', (100*rand()).cast(IntegerType()))\
     .repartition(6000, 'PATIENT_ID_CLAIM') \
     .sortWithinPartitions('PATIENT_ID_CLAIM') \
@@ -321,7 +321,6 @@ save_run_meta(run_meta_df, generate_output_path('run_history'))
 #                              col('batch_id'))\
 #                          .persist(StorageLevel.MEMORY_AND_DISK)
 #
-
 ############################ END  DRUGS
 
 

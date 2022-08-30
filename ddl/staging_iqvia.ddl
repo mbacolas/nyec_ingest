@@ -1,4 +1,3 @@
--- noinspection SqlNoDataSourceInspection
 CREATE TABLE "test"."organization" (
     id varchar(256) not null,
     source_org_oid varchar(256) not null,
@@ -10,7 +9,34 @@ CREATE TABLE "test"."organization" (
 )
 distkey(source_org_oid);
 
-CREATE TABLE "test"."patient"(
+id
+org_id (FK)
+patient_id (FK)
+type (Org, Patient or Contact)
+role
+first_name
+last_name
+phone
+address
+gender
+start_date
+end_date
+
+CREATE TABLE contact (
+    id varchar(256) not null,
+    source_org_oid varchar(256) not null,
+    type varchar(256) not null,
+    primary key (source_org_oid)
+)
+distkey(source_org_oid);
+
+CREATE TABLE "coverage"()
+CREATE TABLE "communication"()
+CREATE TABLE "address"()
+CREATE TABLE "contact"()
+
+
+CREATE TABLE "test"."consumer"(
     id varchar(256) not null,
     mpi varchar(256),
     prefix varchar(256),
@@ -38,7 +64,10 @@ CREATE TABLE "test"."patient"(
 distkey(source_consumer_id)
 compound sortkey(dob, gender);
 
-
+CREATE EXTERNAL TABLE eligibility ()
+CREATE EXTERNAL TABLE coverage ()
+    CREATE TABLE "coverage_gaps"()
+CREATE EXTERNAL TABLE encounter_coverage ()
 
 CREATE EXTERNAL TABLE "claim" (
   `id` string,
@@ -63,6 +92,8 @@ CREATE EXTERNAL TABLE "claim" (
   `place_of_service` string,
   `batch_id` string,
   `date_created` date)
+
+CREATE EXTERNAL TABLE status_history ()
 
 
 CREATE EXTERNAL TABLE `cost`(
@@ -133,7 +164,7 @@ CREATE EXTERNAL TABLE `procedure_modifier`(
   `date_created` date)
 
 
-CREATE EXTERNAL TABLE `product`(
+CREATE EXTERNAL TABLE drug(
   `id` string,
   `status` string,
   `discontinued_date` date,
@@ -158,7 +189,48 @@ CREATE EXTERNAL TABLE `product`(
   `batch_id` string,
   `date_created` date)
 
-CREATE EXTERNAL TABLE `provider`(
+
+CREATE EXTERNAL TABLE lab (
+)
+
+CREATE EXTERNAL TABLE ref_range (
+)
+
+CREATE EXTERNAL TABLE allergy (
+)
+
+CREATE EXTERNAL TABLE reaction (
+)
+
+CREATE EXTERNAL TABLE drg (
+)
+
+CREATE EXTERNAL TABLE immunzation (
+)
+
+CREATE EXTERNAL TABLE vital (
+)
+
+CREATE EXTERNAL TABLE family_history (
+)
+
+CREATE EXTERNAL TABLE reason (
+)
+
+CREATE EXTERNAL TABLE complication_detail (
+)
+
+
+CREATE EXTERNAL TABLE report (
+)
+
+CREATE EXTERNAL TABLE report (
+)
+
+CREATE EXTERNAL TABLE report (
+)
+
+CREATE EXTERNAL TABLE provider (
   `id` string,
   `npi` string,
   `source_org_oid` string,
@@ -168,6 +240,10 @@ CREATE EXTERNAL TABLE `provider`(
   `batch_id` string,
   `date_created` date)
 
+CREATE EXTERNAL TABLE performer (
+)
+
+
 CREATE EXTERNAL TABLE `provider_role`(
   `npi` string,
   `source_provider_id` string,
@@ -176,3 +252,9 @@ CREATE EXTERNAL TABLE `provider_role`(
   `role` string,
   `batch_id` string,
   `date_created` date)
+
+CREATE EXTERNAL TABLE encounter ()
+
+CREATE EXTERNAL TABLE status_history ()
+
+CREATE EXTERNAL TABLE servicing_location ()
