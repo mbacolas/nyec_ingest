@@ -1,4 +1,6 @@
-CREATE TABLE "test"."organization" (
+set search_path to test;
+
+CREATE TABLE organization (
     id varchar(256) not null,
     source_org_oid varchar(256) not null,
     active boolean,
@@ -9,34 +11,100 @@ CREATE TABLE "test"."organization" (
 )
 distkey(source_org_oid);
 
+
+
+CREATE TABLE contact (
+    id varchar(256) not null,
+    source_org_oid varchar(256),
+    source_consumer_id varchar(256) ,
+    type varchar(256) not null,
+    gender varchar(2),
+    start_date date,
+    end_date date,
+CONSTRAINT contact_pkey PRIMARY KEY(id),
+CONSTRAINT contact_source_consumer_id_fkey FOREIGN KEY (source_org_oid, source_consumer_id) REFERENCES consumer(source_org_oid, source_consumer_id),
+CONSTRAINT contact_source_org_oid_fkey FOREIGN KEY (source_org_oid) REFERENCES organization(source_org_oid),
+ unique (source_org_oid, source_consumer_id),
+   unique (source_org_oid, type, start_date)
+  )
+distkey(source_org_oid);
+
+
+CREATE TABLE telcom (
+    id varchar(256) not null,
+    source_org_oid varchar(256),
+    source_consumer_id varchar(256) ,
+    type varchar(256) not null,
+    value varchar(50) not null,
+    is_primary boolean,
+CONSTRAINT telcom_pkey PRIMARY KEY(id),
+CONSTRAINT telcom_source_consumer_id_fkey FOREIGN KEY (source_org_oid, source_consumer_id) REFERENCES consumer(source_org_oid, source_consumer_id),
+CONSTRAINT telcom_source_org_oid_fkey FOREIGN KEY (source_org_oid) REFERENCES organization(source_org_oid))
+distkey(source_org_oid);
+
 id
 org_id (FK)
 patient_id (FK)
 type (Org, Patient or Contact)
-role
-first_name
-last_name
-phone
-address
-gender
+primary: boolean
+use (home, work...)
+type (postal, physical)
+address_line_1
+address_line_2
+city
+state
+zip
 start_date
 end_date
 
-CREATE TABLE contact (
-    id varchar(256) not null,
-    source_org_oid varchar(256) not null,
+CREATE TABLE address(
+        id varchar(256) not null,
+    source_org_oid varchar(256),
+    source_consumer_id varchar(256) ,
     type varchar(256) not null,
-    primary key (source_org_oid)
+
+
 )
-distkey(source_org_oid);
 
+subscriber_id
+relationship
+group_num
+start_date
+end_date
+payor_nm
+type (medical, dental, vision)
 CREATE TABLE "coverage"()
+
+from_date
+to_date
+CREATE TABLE "coverage_gaps"()
+
+language_cd
+preferred: boolean
 CREATE TABLE "communication"()
-CREATE TABLE "address"()
-CREATE TABLE "contact"()
+
+policy_holder
+relationship
+pcp_id
+span_to_date
+span_from_date
+eligibility_start_date
+eligibility_end_date
+employer_group_id
+employer_group_modifier
+benefit_plan_id
+benefit_sequence_number
+preferred_srv_cd
+health_plan_cd
+lob
+classification_cd
+bic
+CREATE TABLE "eligibility"()
 
 
-CREATE TABLE "test"."consumer"(
+
+
+CREATE TABLE consumer (
     id varchar(256) not null,
     mpi varchar(256),
     prefix varchar(256),
@@ -59,7 +127,8 @@ CREATE TABLE "test"."consumer"(
     batch_id varchar(256),
     date_created date,
     primary key(id),
-    foreign key(source_org_oid) references test.organization(source_org_oid)
+    foreign key(source_org_oid) references organization(source_org_oid),
+	unique (source_org_oid, source_consumer_id)
     )
 distkey(source_consumer_id)
 compound sortkey(dob, gender);
@@ -258,3 +327,13 @@ CREATE EXTERNAL TABLE encounter ()
 CREATE EXTERNAL TABLE status_history ()
 
 CREATE EXTERNAL TABLE servicing_location ()
+
+    CREATE TABLE test.contact (
+    id varchar(256) not null,
+    source_org_oid varchar(256) not null,
+    source_consumer_id varchar(256) not null,
+    type varchar(256) not null,
+CONSTRAINT contact_pkey PRIMARY KEY(id),
+CONSTRAINT contact_source_consumer_id_fkey FOREIGN KEY (source_consumer_id) REFERENCES test.patient(source_consumer_id)
+        or
+CONSTRAINT contact_source_org_oid_fkey FOREIGN KEY (source_org_oid) REFERENCES test.organization(source_org_oid));

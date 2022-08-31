@@ -48,16 +48,17 @@ JOB_FLOW_OVERRIDES = {
                 "InstanceCount": 1
             },
             {
+                # 70DPUs --> 150 cores
                 "Name": "Slave nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
                 # "InstanceType": "r5.xlarge",
                 # "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
-                "InstanceType": "m5d.16xlarge",
+                "InstanceType": "m5d.12xlarge",
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 2
+                "InstanceCount": 3
             }
         ],
         "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
@@ -92,8 +93,8 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
-    # return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
+    # return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
@@ -143,7 +144,7 @@ TO_PROCESSED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
 
                      '--conf',
-                     f'spark.executor.memory=60g',
+                     f'spark.executor.memory=25g',
 
                      '--conf',
                      f'spark.executor.cores=35',
@@ -206,19 +207,16 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.file_format=csv',
+                     f'spark.nyec.iqvia.file_format=parquet',
 
                      '--conf',
-                     f'spark.executor.memory=50g',
+                     f'spark.executor.memory=48g',
 
                      '--conf',
-                     f'spark.executor.cores=16',
+                     f'spark.executor.cores=15',
 
                      '--conf',
                      f'spark.sql.shuffle.partitions=6000',
-
-                     '--conf',
-                     f'spark.sql.files.maxPartitionBytes=268435456',
 
                      '--conf',
                      f'spark.driver.memory=16G',
@@ -231,7 +229,7 @@ TO_CURATED_SPARK_STEPS = [
                      # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
 
                      '--conf',
-                     f'num-executors=8',
+                     f'num-executors=12',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
@@ -242,6 +240,8 @@ TO_CURATED_SPARK_STEPS = [
     }
 ]
 
+# '--conf',
+# f'spark.sql.files.maxPartitionBytes=268435456',
 
 default_args = {
     'owner': 'airflow',

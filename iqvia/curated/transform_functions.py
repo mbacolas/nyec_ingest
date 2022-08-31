@@ -149,19 +149,7 @@ def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd \
         .filter(lambda r: r.PRC_CD is not None) \
         .map(lambda r: _to_procedure_row(r, ref_lookup)) \
-        .toDF(stage_procedure_schema) \
-        .repartition(6000, 'source_consumer_id',
-                     'start_date',
-                     'code_raw',
-                     'code_system_raw') \
-        .sortWithinPartitions('source_consumer_id',
-                              'start_date',
-                              'code_raw',
-                              'code_system_raw') \
-        .dropDuplicates(['source_consumer_id',
-                         'start_date',
-                         'code_raw',
-                         'code_system_raw'])
+        .toDF(stage_procedure_schema)
 
 
 # def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:

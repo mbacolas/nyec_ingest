@@ -134,8 +134,7 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
                                 .sortWithinPartitions(col('source_consumer_id'),
                                                       col('code_system'),
                                                       col('code'),
-                                                      col('mod'
-                                                          '')) \
+                                                      col('mod')) \
                                 .write\
                                 .parquet(output_path, mode='overwrite', compression='snappy')
 
