@@ -323,10 +323,12 @@ CREATE EXTERNAL TABLE `provider_role`(
   `date_created` date)
 
 CREATE EXTERNAL TABLE encounter ()
+CREATE EXTERNAL TABLE encounter_coverage ()
 
 CREATE EXTERNAL TABLE status_history ()
 
 CREATE EXTERNAL TABLE servicing_location ()
+CREATE EXTERNAL TABLE servicing_location_to_provider ()
 
     CREATE TABLE test.contact (
     id varchar(256) not null,

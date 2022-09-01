@@ -102,14 +102,16 @@ raw_plan_df = load_plan(spark, plan_path, raw_plan_schema, file_format)\
 raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_format) \
     .withColumn('PATIENT_SALT', (100*rand()).cast(IntegerType()))\
     .repartition(6000, 'PATIENT_ID') \
-    .sortWithinPartitions('PATIENT_ID')
+    .sortWithinPartitions('PATIENT_ID') \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
 # .withColumn('SALT', (10*rand()).cast(IntegerType()))\
 # .limit(10 * 1000 * 1000)\
 raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
     .withColumn('CLAIM_SALT', (100*rand()).cast(IntegerType()))\
     .repartition(6000, 'PATIENT_ID_CLAIM') \
-    .sortWithinPartitions('PATIENT_ID_CLAIM')
+    .sortWithinPartitions('PATIENT_ID_CLAIM') \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format)
@@ -179,104 +181,53 @@ def ref_lookup(event_type: str, key: str):
 patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
     .withColumn('source_org_oid', lit('IQVIA')) \
     .withColumn('date_created', lit(date_created)) \
-    .rdd
-    # .persist(StorageLevel.MEMORY_AND_DISK)
+    .rdd \
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
-# currated_patient_df = to_patient(patient_rdd) #.persist(StorageLevel.MEMORY_AND_DISK)
-# patient_rdd.unpersist()
+currated_patient_df = to_patient(patient_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+patient_rdd.unpersist()
 
 # currated_patient_df = currated_patient_rdd.toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
-# save_patient(currated_patient_df, generate_output_path('patient'))
+save_patient(currated_patient_df, generate_output_path('patient'))
 # save_errors(currated_patient_rdd, PATIENT, generate_output_path('error'))
 
 # currated_patient_rdd.unpersist()
-# currated_patient_df.unpersist()
-print(f'------------------------>>>>>>> saved patient {datetime.now()}<<<--- ')
+currated_patient_df.unpersist()
+print('------------------------>>>>>>> saved patient <<<--- ')
 
 # raw_claim_df.CLAIM_SALT == raw_patient_df.PATIENT_SALT
 ### create clinical events
-
-
-patient_claims_raw_df = raw_patient_df \
+patient_claims_raw_rdd = raw_patient_df \
     .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
-    # .rdd
-    # .persist(StorageLevel.MEMORY_AND_DISK)
+    .rdd\
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
-print(f'------------------------>>>>>>> done saving patient {datetime.now()}<<<--- ')
-print('------------------------>>>>>>> created patient_claims_raw_rdd... writing join results to s3')
-join_start = datetime.now()
-patient_claims_raw_df.write.parquet(generate_output_path('delete_me_please'), mode='overwrite', compression='snappy')
+print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
-join_end = datetime.now()
-join_total = join_end - join_start
-join_duration = timedelta(seconds=join_total.total_seconds())
-print(f'------------------------>>>>>>>  join_start: {join_start} : join_end: {join_end} : join_duration: {str(join_duration)}')
 ### create procedure
 
-rdd_start = datetime.now()
-print(f'------------------------>>>>>>> starting with rdd {datetime.now()}<<<--- ')
-patient_claims_raw_rdd = patient_claims_raw_df.rdd
 
-print(f'------------------------>>>>>>> done with rdd {datetime.now()}<<<--- ')
-
-rdd_end = datetime.now()
-rdd_total = rdd_end - rdd_start
-rdd_duration = timedelta(seconds=rdd_total.total_seconds())
-print(f'------------------------>>>>>>>  rdd_start: {rdd_start} : rdd_end: {rdd_end} : rdd_duration: {str(rdd_duration)}')
-
-proc_start = datetime.now()
-procedure_df_np = to_procedure(patient_claims_raw_rdd, ref_lookup)
-procedure_df_np.first()
-
-proc_end = datetime.now()
-proc_total = proc_end - proc_start
-proc_duration = timedelta(seconds=proc_total.total_seconds())
-print(f'------------------------>>>>>>>  done with proc. proc_start: {proc_start} : proc_end: {proc_end} : proc_duration: {str(proc_duration)}')
-print(f'------------------------>>>>>>>  start of dedup and saving proc: {datetime.now()}')
-
-procedure_df1 = procedure_df_np.repartition(6000, 'source_consumer_id',
-                                                 'start_date',
-                                                 'code_raw',
-                                                 'code_system_raw') \
-                                    .sortWithinPartitions('source_consumer_id',
-                                                          'start_date',
-                                                          'code_raw',
-                                                          'code_system_raw') \
-                                    .dropDuplicates(['source_consumer_id',
-                                                     'start_date',
-                                                     'code_raw',
-                                                     'code_system_raw'])
-procedure_df1.first()
-print(f'------------------------>>>>>>>  end of dedup : {datetime.now()} .. .start of keyBy')
-procedure_df2 = procedure_df_np.rdd.keyBy(lambda r: (r.source_consumer_id, r.start_date, r.code_raw, r.code_system_raw)) \
-                    .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-                    .reduceByKey((lambda a, b: a)) \
-                    .map(lambda r: r[1])
-procedure_df2.first()
-print(f'------------------------>>>>>>>  start of and saving proc: {datetime.now()} end of keyBy, start of save')
-procedure_df = procedure_df2
-save_procedure(procedure_df, generate_output_path('procedure'))
+procedure_df = to_procedure(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(procedure_rdd, PROCEDURE, generate_output_path('error'))
-
-print(f'------------------------>>>>>>>  end of of  saving proc,pds: {datetime.now()}')
-save_procedure_modifiers(procedure_df.rdd, generate_output_path('procedure_modifier'))
+save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
 # currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
-
-# procedure_df.unpersist(False)
+save_procedure(procedure_df, generate_output_path('procedure'))
+procedure_df.unpersist(False)
 # procedure_rdd.unpersist(False)
-# raw_patient_df.unpersist()
-# raw_claim_df.unpersist()
+raw_patient_df.unpersist()
+raw_claim_df.unpersist()
 
-print(f'------------------------>>>>>>> saved proc mods {datetime.now()}')
+print('------------------------>>>>>>> saved procs')
+
 ### problems
-problem_df = to_problem(patient_claims_raw_rdd, ref_lookup)#.persist(StorageLevel.MEMORY_AND_DISK)
+problem_df = to_problem(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(problem_rdd, PROBLEM, generate_output_path('error'))
-admitting_problem_df = to_admitting_diagnosis(patient_claims_raw_rdd) #.persist(StorageLevel.MEMORY_AND_DISK)
+admitting_problem_df = to_admitting_diagnosis(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(admitting_problem_rdd, PROBLEM, generate_output_path('error'))
 
-all_problem_df = problem_df.union(admitting_problem_df)#.persist(StorageLevel.MEMORY_AND_DISK)
+all_problem_df = problem_df.union(admitting_problem_df).persist(StorageLevel.MEMORY_AND_DISK)
 save_problem(all_problem_df, generate_output_path('diagnosis'))
 all_problem_df.unpersist(False)
 problem_df.unpersist(False)
@@ -286,7 +237,7 @@ print('------------------------>>>>>>> saved problems')
 
 
 ### drug
-drug_df = to_drug(patient_claims_raw_rdd, ref_lookup)#.persist(StorageLevel.MEMORY_AND_DISK)
+drug_df = to_drug(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(drug_rdd, DRUG, generate_output_path('error'))
 # currated_df = drug_rdd.toDF(stage_drug_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_drug(drug_df, generate_output_path('drug'))
@@ -296,7 +247,7 @@ print('------------------------>>>>>>> saved drugs')
 
 
 ### cost
-cost_df = to_cost(patient_claims_raw_rdd)#.persist(StorageLevel.MEMORY_AND_DISK)
+cost_df = to_cost(patient_claims_raw_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(cost_rdd, COST, generate_output_path('error'))
 # currated_df = cost_rdd.toDF(stage_cost_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_cost(cost_df, generate_output_path('cost'))
@@ -306,7 +257,7 @@ print('------------------------>>>>>>> saved cost')
 
 
 ### claim
-claim_record_df = to_claim(patient_claims_raw_rdd, ref_lookup)#.persist(StorageLevel.MEMORY_AND_DISK)
+claim_record_df = to_claim(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(claim_record_rdd, CLAIM, generate_output_path('error'))
 # currated_df = claim_record_rdd.toDF(stage_claim_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_claim(claim_record_df, generate_output_path('claim'))
@@ -322,7 +273,7 @@ org_df.unpersist()
 
 
 ### provider
-practitioner_df = to_practitioner(patient_claims_raw_rdd, ref_lookup)#.persist(StorageLevel.MEMORY_AND_DISK)
+practitioner_df = to_practitioner(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 # save_errors(practitioner_rdd, PRACTIONER, generate_output_path('error'))
 # practitioner_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
 practitioner_role_df = to_practitioner_role(practitioner_df)
@@ -343,6 +294,7 @@ file_paths = {'plan': plan_path,
               'drug': drug_path,
               'provider': provider_path}
 
+start = datetime.now()
 end = datetime.now()
 total = end - start
 duration = timedelta(seconds=total.total_seconds())

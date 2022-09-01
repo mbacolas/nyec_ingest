@@ -259,8 +259,9 @@ def save_provider(currated_provider_df: DataFrame, output_path: str):
                 col('active'),
                 col('batch_id'),
                 col('date_created')) \
-        .repartition(6000, col('source_provider_id')) \
-        .sortWithinPartitions(col('source_provider_id')) \
+        .repartition(6000, 'source_provider_id') \
+        .sortWithinPartitions('source_provider_id') \
+        .dropDuplicates(['source_provider_id'])\
         .write\
         .parquet(output_path, mode='overwrite', compression='snappy')
 

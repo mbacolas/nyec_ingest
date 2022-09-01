@@ -149,8 +149,19 @@ def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd \
         .filter(lambda r: r.PRC_CD is not None) \
         .map(lambda r: _to_procedure_row(r, ref_lookup)) \
-        .toDF(stage_procedure_schema)
-
+        .toDF(stage_procedure_schema) \
+        .repartition(6000, 'source_consumer_id',
+                     'start_date',
+                     'code_raw',
+                     'code_system_raw') \
+        .sortWithinPartitions('source_consumer_id',
+                              'start_date',
+                              'code_raw',
+                              'code_system_raw') \
+        .dropDuplicates(['source_consumer_id',
+                         'start_date',
+                         'code_raw',
+                         'code_system_raw'])
 
 # def to_procedure(claim_rdd: RDD, ref_lookup) -> RDD:
 #     return claim_rdd.filter(lambda r: r.PRC_CD is not None)\
@@ -736,8 +747,10 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
 def to_practitioner(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd\
         .flatMap(lambda r: _to_practitioner_row(r, ref_lookup))\
-        .toDF(stage_provider_schema)
-    # .filter(lambda r: r.source_provider_id is not None and r.provider_type=='1')
+        .toDF(stage_provider_schema)\
+        # .repartition(6000, 'source_provider_id', 'provider_type') \
+        # .sortWithinPartitions('source_provider_id', 'provider_type') \
+        # .dropDuplicates(['source_provider_id', 'provider_type'])
 
 
 def to_practitioner_role(practitioner_df: DataFrame) -> DataFrame:
