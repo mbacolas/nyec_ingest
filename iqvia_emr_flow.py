@@ -30,7 +30,7 @@ from airflow.models import Variable
 # iqvia_data_types = Variable.get("iqvia_data_types", deserialize_json=True)
 
 
-JOB_FLOW_OVERRIDES = {
+PROCESSED_JOB_FLOW_OVERRIDES = {
     "Name": "nyec-cluster-" + execution_date,
     "ReleaseLabel": "emr-6.7.0",
     "LogUri": "s3://{}/logs/emr/".format(S3_BUCKET_NAME),
@@ -40,10 +40,7 @@ JOB_FLOW_OVERRIDES = {
                 "Name": "Master nodes",
                 "Market": "ON_DEMAND",
                 "InstanceRole": "MASTER",
-                # "InstanceType": "c5.large",
-                # "InstanceType": "m4.large",
-                # "InstanceType": "m5.xlarge",
-                "InstanceType": "m4.xlarge",
+                "InstanceType": "m4.large",
                 "InstanceCount": 1
             },
             {
@@ -52,7 +49,56 @@ JOB_FLOW_OVERRIDES = {
                 "InstanceRole": "CORE",
                 # "InstanceType": "r5.xlarge",
                 # "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
-                "InstanceType": "m5d.16xlarge",
+                "InstanceType": "m5d.12xlarge",
+                # "InstanceType": "m5d.16xlarge",
+                # "InstanceType": "r5.4xlarge",
+                # "InstanceType": "m5.xlarge",
+                # "InstanceCount": 18
+                "InstanceCount": 1
+            }
+        ],
+        "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
+        # "Ec2SubnetId": subnetID['Parameter']['Value'],
+        "TerminationProtected": False,
+        "KeepJobFlowAliveWhenNoSteps": False
+    },
+    'JobFlowRole': 'EMR_EC2_DefaultRole',
+    'ServiceRole': 'EMR_DefaultRole',
+    'Applications': [
+        {
+            'Name': 'Spark'
+        }
+    ],
+    'BootstrapActions': [
+        {
+            'Name': 'pip-install-dependencies',
+            'ScriptBootstrapAction': {
+                'Path': 's3://nyec-scripts/bootstrap/bootstrap.sh',
+            }
+        }
+    ]
+}
+
+CURATED_JOB_FLOW_OVERRIDES = {
+    "Name": "nyec-cluster-" + execution_date,
+    "ReleaseLabel": "emr-6.7.0",
+    "LogUri": "s3://{}/logs/emr/".format(S3_BUCKET_NAME),
+    "Instances": {
+        "InstanceGroups": [
+            {
+                "Name": "Master nodes",
+                "Market": "ON_DEMAND",
+                "InstanceRole": "MASTER",
+                "InstanceType": "m4.xlarge",
+                "InstanceCount": 1
+            },
+            {
+                "Name": "Slave nodes",
+                "Market": "ON_DEMAND",
+                "InstanceRole": "CORE",
+                # "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
+                "InstanceType": "m5d.12xlarge",
+                # "InstanceType": "m5d.16xlarge",
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
@@ -142,7 +188,7 @@ TO_PROCESSED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
 
                      '--conf',
-                     f'spark.executor.memory=50g',
+                     f'spark.executor.memory=38g',
 
                      '--conf',
                      f'spark.executor.cores=16',
@@ -154,17 +200,17 @@ TO_PROCESSED_SPARK_STEPS = [
                      f'spark.sql.files.maxPartitionBytes=268435456',
 
                      '--conf',
-                     f'spark.driver.memory=16G',
+                     f'spark.driver.memory=8G',
 
                      '--conf',
-                     f'spark.driver.cores=4',
+                     f'spark.driver.cores=2',
 
                      '--conf',
                      f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -XX:OnOutOfMemoryError=\'kill -9 %p\'',
                      # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
 
                      '--conf',
-                     f'num-executors=8',
+                     f'num-executors=4',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
@@ -224,7 +270,7 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.file_format=csv',
 
                      '--conf',
-                     f'spark.executor.memory=50g',
+                     f'spark.executor.memory=35g',
 
                      '--conf',
                      f'spark.executor.cores=16',
@@ -279,18 +325,34 @@ iqvia_emr_flow = DAG(
     # schedule_interval=timedelta(minutes=10)
 )
 
-create_emr_cluster = EmrCreateJobFlowOperator(
-    task_id='create_emr_cluster',
-    job_flow_overrides=JOB_FLOW_OVERRIDES,
+create_processed_emr_cluster = EmrCreateJobFlowOperator(
+    task_id='create_processed_emr_cluster',
+    job_flow_overrides=PROCESSED_JOB_FLOW_OVERRIDES,
+    aws_conn_id='aws_default',
+    emr_conn_id='emr_test',
+    dag=iqvia_emr_flow
+)
+
+create_curated_emr_cluster = EmrCreateJobFlowOperator(
+    task_id='create_curated_emr_cluster',
+    job_flow_overrides=CURATED_JOB_FLOW_OVERRIDES,
     aws_conn_id='aws_default',
     emr_conn_id='emr_test',
     dag=iqvia_emr_flow
 )
 
 # Adding a sensor to monitor the EMR cluster creation
-sensor_create_emr_cluster = EmrJobFlowSensor(
+sensor_create_processed_emr_cluster = EmrJobFlowSensor(
     task_id='check_emr_create_cluster_job_flow',
-    job_flow_id=create_emr_cluster.output,
+    job_flow_id=create_processed_emr_cluster.output,
+    target_states=['WAITING'],
+    dag=iqvia_emr_flow
+)
+
+
+sensor_create_curated_emr_cluster = EmrJobFlowSensor(
+    task_id='check_emr_create_cluster_job_flow',
+    job_flow_id=create_curated_emr_cluster.output,
     target_states=['WAITING'],
     dag=iqvia_emr_flow
 )
@@ -298,7 +360,7 @@ sensor_create_emr_cluster = EmrJobFlowSensor(
 # Define Processed Step & a sensor to monitor it
 trigger_processed_emr_job = EmrAddStepsOperator(
     task_id='trigger_processed_emr_job',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+    job_flow_id="{{ task_instance.xcom_pull('create_processed_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
     steps=TO_PROCESSED_SPARK_STEPS,
     dag=iqvia_emr_flow
@@ -316,7 +378,7 @@ step_checker_trigger_processed_emr_job = EmrStepSensor(
 # Define a curated step & a sensor to monitor it
 trigger_curated_emr_job = EmrAddStepsOperator(
     task_id='trigger_curated_emr_job',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+    job_flow_id="{{ task_instance.xcom_pull('create_curated_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
     steps=TO_CURATED_SPARK_STEPS,
     dag=iqvia_emr_flow
@@ -330,5 +392,5 @@ step_checker_trigger_curated_emr_job = EmrStepSensor(
     dag=iqvia_emr_flow
 )
 
-create_emr_cluster >> sensor_create_emr_cluster >> trigger_processed_emr_job >> step_checker_trigger_processed_emr_job
-create_emr_cluster >> sensor_create_emr_cluster >> trigger_curated_emr_job >> step_checker_trigger_curated_emr_job
+create_processed_emr_cluster >> sensor_create_processed_emr_cluster >> trigger_processed_emr_job >> step_checker_trigger_processed_emr_job
+create_processed_emr_cluster >> sensor_create_processed_emr_cluster >> trigger_curated_emr_job >> step_checker_trigger_curated_emr_job

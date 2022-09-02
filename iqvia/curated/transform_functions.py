@@ -86,16 +86,17 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
 
-    cached_proc = ref_lookup(PROCEDURE, claim_row.PRC_CD + ':' + claim_row.PRC_VERS_TYP_ID)
-    code_system = cached_proc.get('PRC_TYP_CD', None)
-    all_code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, code_system,
+    code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, claim_row.PRC_TYP_CD,
                                                      'PRC_VERS_TYP_ID:PRC_TYP_CD')
 
-    proc_code_result = get_code(claim_row.PRC_CD, all_code_system_result.value, 'PRC_CD')
-    rev_code_result = get_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
+    cached_proc = ref_lookup(PROCEDURE, claim_row.PRC_CD + ':' + code_system_result.value)
+    # code_system = cached_proc.get('PRC_TYP_CD', None)
+
+    proc_code_result = find_code(claim_row.PRC_CD, code_system_result.value, 'PRC_CD')
+    rev_code_result = find_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
     proc_code = extract_code(proc_code_result)
     rev_code = extract_code(rev_code_result)
-    validation_errors = extract_left(*[all_code_system_result,
+    validation_errors = extract_left(*[code_system_result,
                                        start_date_result,
                                        to_date_result,
                                        proc_code_result,
@@ -120,7 +121,7 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
                    to_date=to_date_result.value,
                    code_raw=claim_row.PRC_CD,
                    code=proc_code.get('code', None),
-                   code_system_raw=code_system,
+                   code_system_raw=f'{claim_row.PRC_VERS_TYP_ID}:{claim_row.PRC_TYP_CD}',
                    # code_system_raw=claim_row.PRC_TYP_CD,
                    code_system=proc_code.get('code_system', None),
                    revenue_code_raw=claim_row.CLAIM_HOSP_REV_CD,
@@ -178,7 +179,7 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
     all_code_system_result = to_standard_code_system(claim_row.DIAG_VERS_TYP_ID, claim_row.DIAG_CD,
                                                      'DIAG_VERS_TYP_ID:DIAG_CD')
-    diag_code_result = get_code(claim_row.DIAG_CD, all_code_system_result.value, 'DIAG_VERS_TYP_ID:DIAG_CD')
+    diag_code_result = find_code(claim_row.DIAG_CD, all_code_system_result.value, 'DIAG_VERS_TYP_ID:DIAG_CD')
     diag_code = extract_code(diag_code_result)
     validation_errors = extract_left(*[all_code_system_result,
                                        start_date_result,
@@ -255,7 +256,7 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     start_date_result = str_to_date(claim_row.HOSP_ADMT_DT, 'HOSP_ADMT_DT')
     to_date_result = str_to_date(claim_row.HOSP_DISCHG_DT, 'HOSP_DISCHG_DT')
     all_code_system_result = to_standard_code_system(claim_row.ADMS_DIAG_VERS_TYP_ID, None, 'ADMS_DIAG_VERS_TYP_ID')
-    diag_code_result = get_code(claim_row.ADMS_DIAG_CD, all_code_system_result.value, 'ADMS_DIAG_CD')
+    diag_code_result = find_code(claim_row.ADMS_DIAG_CD, all_code_system_result.value, 'ADMS_DIAG_CD')
     diag_code = extract_code(diag_code_result)
     validation_errors = extract_left(*[all_code_system_result,
                                        start_date_result,
@@ -326,7 +327,7 @@ def to_admitting_diagnosis(claim_rdd: RDD) -> DataFrame:
 def _to_drug_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
-    drug_code_result = get_code(claim_row.NDC_CD, 'NDC_CD', 'NDC_CD')
+    drug_code_result = find_code(claim_row.NDC_CD, 'NDC_CD', 'NDC_CD')
     drug_code = extract_code(drug_code_result)
     validation_errors = extract_left(*[start_date_result,
                                        to_date_result,

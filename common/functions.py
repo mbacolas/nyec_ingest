@@ -37,7 +37,7 @@ def tmp_function(code_system_raw: str, code_raw:str):
         return {'code': search_key.split(':')[0], 'code_system': search_key.split(':')[1], 'desc': 'UNKNOWN'}
 
 # get_code(claim_row.PRC_CD, all_code_system_result.value, 'PRC_CD')
-def get_code(code_raw: str, code_system_raw: str, source_column_name: str) -> Either:
+def find_code(code_raw: str, code_system_raw: str, source_column_name: str) -> Either:
     # code_dict = all_codes.get(f'{code_system_raw}:{code_raw}', None)
     code_dict = tmp_function(code_system_raw, code_raw)
     if code_dict is not None:

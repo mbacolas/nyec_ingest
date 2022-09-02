@@ -7,7 +7,7 @@ from pyspark.sql.types import StructType
 
 
 def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimiter='|', file_header=True,
-            infer_schema=False, format_type='parquet'):
+            infer_schema=False, format_type='csv'):
     if format_type == 'csv':
         if not infer_schema:
             return spark.read \

@@ -15,6 +15,7 @@ distkey(source_org_oid);
 
 CREATE TABLE contact (
     id varchar(256) not null,
+    dist_key varchar(32) not null, --md5(source_org_oid:source_consumer_id)/md5(source_org_oid)
     source_org_oid varchar(256),
     source_consumer_id varchar(256) ,
     type varchar(256) not null,
@@ -27,11 +28,12 @@ CONSTRAINT contact_source_org_oid_fkey FOREIGN KEY (source_org_oid) REFERENCES o
  unique (source_org_oid, source_consumer_id),
    unique (source_org_oid, type, start_date)
   )
-distkey(source_org_oid);
+distkey(dist_key);
 
 
 CREATE TABLE telcom (
     id varchar(256) not null,
+    dist_key varchar(32) not null, --md5(source_org_oid:source_consumer_id)/md5(source_org_oid)
     source_org_oid varchar(256),
     source_consumer_id varchar(256) ,
     type varchar(256) not null,
@@ -42,29 +44,26 @@ CONSTRAINT telcom_source_consumer_id_fkey FOREIGN KEY (source_org_oid, source_co
 CONSTRAINT telcom_source_org_oid_fkey FOREIGN KEY (source_org_oid) REFERENCES organization(source_org_oid))
 distkey(source_org_oid);
 
-id
-org_id (FK)
-patient_id (FK)
-type (Org, Patient or Contact)
-primary: boolean
-use (home, work...)
-type (postal, physical)
-address_line_1
-address_line_2
-city
-state
-zip
-start_date
-end_date
 
-CREATE TABLE address(
-        id varchar(256) not null,
+CREATE TABLE address (
+    id varchar(256) not null,
+    dist_key varchar(32) not null, --md5(source_org_oid:source_consumer_id)/md5(source_org_oid)
     source_org_oid varchar(256),
     source_consumer_id varchar(256) ,
-    type varchar(256) not null,
-
-
-)
+    type varchar(12) not null,
+    primary boolean,
+    use varchar(12),
+    address_line_1 varchar(256),
+    address_line_2 varchar(256),
+    city varchar(256) not null,
+    state varchar(2) not null,
+    zip varchar(12) not null,
+    start_date date,
+    end_date date,
+    CONSTRAINT address_pkey PRIMARY KEY(id),
+    CONSTRAINT address_source_consumer_id_fkey FOREIGN KEY (source_org_oid, source_consumer_id) REFERENCES consumer(source_org_oid, source_consumer_id),
+    CONSTRAINT address_source_org_oid_fkey FOREIGN KEY (source_org_oid) REFERENCES organization(source_org_oid))
+distkey(dist_key);
 
 subscriber_id
 relationship
@@ -83,29 +82,36 @@ language_cd
 preferred: boolean
 CREATE TABLE "communication"()
 
-policy_holder
-relationship
-pcp_id
-span_to_date
-span_from_date
-eligibility_start_date
-eligibility_end_date
-employer_group_id
-employer_group_modifier
-benefit_plan_id
-benefit_sequence_number
-preferred_srv_cd
-health_plan_cd
-lob
-classification_cd
-bic
-CREATE TABLE "eligibility"()
 
-
+CREATE TABLE eligibility (
+    id varchar(256) not null,
+    source_org_oid varchar(256) not null,
+    source_consumer_id varchar(256) not null,
+    dist_key varchar(32) not null, --md5(source_org_oid:source_consumer_id)
+    policy_holder varchar(256),
+    relationship varchar(256),
+    pcp_id varchar(256),
+    span_to_date varchar(256),
+    span_from_date varchar(256),
+    eligibility_start_date varchar(256),
+    eligibility_end_date varchar(256),
+    employer_group_id varchar(256),
+    employer_group_modifier varchar(256),
+    benefit_plan_id varchar(256),
+    benefit_sequence_number varchar(256),
+    preferred_srv_cd varchar(256),
+    health_plan_cd varchar(256),
+    lob varchar(256),
+    bic varchar(256),
+    CONSTRAINT eligibility_pkey PRIMARY KEY(id),
+    CONSTRAINT eligibility_source_consumer_id_fkey FOREIGN KEY (source_org_oid, source_consumer_id) REFERENCES consumer(source_org_oid, source_consumer_id),
+)
+distkey(dist_key);
 
 
 CREATE TABLE consumer (
     id varchar(256) not null,
+    dist_key varchar(32) not null, --md5(source_org_oid:source_consumer_id)
     mpi varchar(256),
     prefix varchar(256),
     suffix varchar(256),
@@ -130,8 +136,9 @@ CREATE TABLE consumer (
     foreign key(source_org_oid) references organization(source_org_oid),
 	unique (source_org_oid, source_consumer_id)
     )
-distkey(source_consumer_id)
-compound sortkey(dob, gender);
+distkey(dist_key)
+-- compound sortkey(dob, gender);
+
 
 CREATE EXTERNAL TABLE eligibility ()
 CREATE EXTERNAL TABLE coverage ()
