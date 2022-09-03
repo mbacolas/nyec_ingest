@@ -71,7 +71,7 @@ provider_path = conf.get("spark.nyec.iqvia.raw_provider_ingest_path")
 iqvia_curated_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_curated_s3_prefix")
 batch_id = conf.get("spark.nyec.iqvia.batch_id", generate_batch_id())
 # batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
-file_format = conf.get("spark.nyec.iqvia.file_format", 'parquet')
+file_format = conf.get("spark.nyec.iqvia.file_format", 'csv')
 
 
 # raw_pro_provider_ingest_path = conf.get("spark.nyec.iqvia.raw_pro_provider_ingest_path")
@@ -160,8 +160,7 @@ problem_cache = dict(
     [(row["DIAG_CD"] + ':' + get_code_system(row["DIAG_VERS_TYP_ID"], ''), dict(DIAG_SHORT_DESC=row['DIAG_SHORT_DESC']))
      for row in problem_list if get_code_system(row["DIAG_VERS_TYP_ID"], '') is not None])
 
-proc_cache = dict([(row["PRC_CD"] + ':' + get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']), row.asDict())
-                   for row in proc_list if get_code_system(row["PRC_VERS_TYP_ID"], row['PRC_TYP_CD']) is not None])
+proc_cache = dict([(row["PRC_CD"] + ':' + row["PRC_VERS_TYP_ID"], row.asDict()) for row in proc_list ])
 
 ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PRACTIONER: provider_cache,
              PLAN: plan_cache}

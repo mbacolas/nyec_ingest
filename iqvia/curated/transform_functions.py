@@ -86,11 +86,9 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
     start_date_result = str_to_date(claim_row.SVC_FR_DT, 'SVC_FR_DT')
     to_date_result = str_to_date(claim_row.SVC_TO_DT, 'SVC_TO_DT', False)
 
-    code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, claim_row.PRC_TYP_CD,
-                                                     'PRC_VERS_TYP_ID:PRC_TYP_CD')
-
-    cached_proc = ref_lookup(PROCEDURE, claim_row.PRC_CD + ':' + code_system_result.value)
-    # code_system = cached_proc.get('PRC_TYP_CD', None)
+    cached_proc = ref_lookup(PROCEDURE, claim_row.PRC_CD + ':' + claim_row.PRC_VERS_TYP_ID)
+    code_system_result = to_standard_code_system(claim_row.PRC_VERS_TYP_ID, cached_proc.get('PRC_TYP_CD', None),
+                                                 'PRC_VERS_TYP_ID:PRC_TYP_CD')
 
     proc_code_result = find_code(claim_row.PRC_CD, code_system_result.value, 'PRC_CD')
     rev_code_result = find_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
@@ -121,7 +119,7 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
                    to_date=to_date_result.value,
                    code_raw=claim_row.PRC_CD,
                    code=proc_code.get('code', None),
-                   code_system_raw=f'{claim_row.PRC_VERS_TYP_ID}:{claim_row.PRC_TYP_CD}',
+                   code_system_raw=f'{claim_row.PRC_VERS_TYP_ID}:{cached_proc.get("PRC_TYP_CD", None)}',
                    # code_system_raw=claim_row.PRC_TYP_CD,
                    code_system=proc_code.get('code_system', None),
                    revenue_code_raw=claim_row.CLAIM_HOSP_REV_CD,
