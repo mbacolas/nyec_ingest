@@ -23,12 +23,20 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 
 def save_errors(error_df: DataFrame, row_type: str, output_path: str):
     error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
-    .select('batch_id', 'date_created', 'error') \
-        .withColumn('row_type', lit(row_type)) \
-        .withColumn('row_errors', lit(json.dumps(col('error')))) \
-        .withColumn('row_value', lit(map_values(error_df.properties))) \
+        .rdd\
+        .map(lambda r: Row(batch_id=r.batch_id,
+                           type=row_type,
+                           row_errors=json.dumps(r.error),
+                           row_value=json.dumps(r.asDict()),
+                           date_created=datetime.now())) \
+        .toDF(error_schema) \
         .write \
         .parquet(output_path, mode='append', compression='snappy')
+        # .select('batch_id', 'date_created', 'error', 'source_consumer_id') \
+        # .withColumn('row_type', lit(row_type)) \
+        # .withColumn('row_errors', lit(json.dumps(col('error')))) \
+        # .withColumn('row_value', lit(map_values(error_df.properties))) \
+
 
 
         # .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')

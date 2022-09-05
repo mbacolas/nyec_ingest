@@ -25,7 +25,7 @@ def str_to_date(date_raw: str, source_column_name: str, is_required=True, date_f
     except Exception as e:
         e = traceback.format_exc()
         error = {'error': e, 'raw_value': date_raw, 'date_format': date_format, 'source_column': source_column_name}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 #TODO: REMOVE once ref data is loaded
@@ -46,7 +46,7 @@ def find_code(code_raw: str, code_system_raw: str, source_column_name: str) -> E
         error = {'error': f'CODE_SYSTEM:CODE {code_system_raw}:{code_raw} NOT FOUND or is INVALID',
                  'source_column_value': f'{code_system_raw}:{code_raw}',
                  'source_column_name': source_column_name}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def check_code_system(code_system_raw: str, source_column_name: str) -> Either:
@@ -56,7 +56,7 @@ def check_code_system(code_system_raw: str, source_column_name: str) -> Either:
     else:
         error = {'source_column_name': 'code_system', 'error': f'CODE_SYSTEM {code_system_raw} NOT FOUND',
                  'source_column_value': code_system_raw, 'source_column_name': source_column_name}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def get_code_desc(code_raw: str, code_system_raw: str, source_column_name: str) -> Either:
@@ -77,7 +77,7 @@ def is_included(obj: str, source_column_name: str, enum: list) -> Either:
         error = {'source_column_name': source_column_name,
                  'error': f'{source_column_name} IS NOT IN THE INCLUDED ENUM {enum}',
                  'source_column_value': obj}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def is_number(obj: str, source_column_name: str) -> Either:
@@ -87,7 +87,7 @@ def is_number(obj: str, source_column_name: str) -> Either:
         error = {'source_column_name': source_column_name,
                  'error': f'{source_column_name} value is either None/Null or not numeric',
                  'source_column_value': obj}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def is_null(obj: str, source_column_name: str) -> Either:
@@ -97,7 +97,7 @@ def is_null(obj: str, source_column_name: str) -> Either:
         error = {'source_column_name': source_column_name,
                  'error': f'{source_column_name} value is None/Null',
                  'source_column_value': obj}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def to_claim_type(source_type: str) -> Either:
@@ -108,7 +108,7 @@ def to_claim_type(source_type: str) -> Either:
     else:
         error = {'source_column_name': 'CLAIM_TYP_CD', 'error': f'exepected value (I or P) not found',
                  'source_column_value': source_type}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def validate_facility_type_cd(cd: str) -> Either:
@@ -124,7 +124,7 @@ def validate_facility_type_cd(cd: str) -> Either:
         return Right(cd)
     else:
         error = {'source_column_name': 'FCLT_TYP_CD', 'error': f'invalid facility type cd', 'source_column_value': cd}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 def validate_admission_source_cd(cd: str) -> Either:

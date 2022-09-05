@@ -38,7 +38,7 @@ def extract_left(*result: Either):
     for r in result:
         if r is None:
             error = {'error': f'Value is None'}
-            error.append(json.dumps(error))
+            error.append(error)
         elif r.is_left():
             error.append(r.either(lambda x: x, lambda x: x))
     return error
@@ -62,7 +62,7 @@ def validate_provider_type(provider_type: str) -> Either:
     else:
         error = {'source_column_name': 'PROVIDER_TYP_ID', 'error': f'invalid PROVIDER_TYP_ID',
                  'source_column_value': provider_type}
-        return Left(json.dumps(error))
+        return Left(error)
 
 
 # from iqvia.common.functions import *
@@ -91,14 +91,21 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
                                                  'PRC_VERS_TYP_ID:PRC_TYP_CD')
 
     proc_code_result = find_code(claim_row.PRC_CD, code_system_result.value, 'PRC_CD')
-    rev_code_result = find_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
+
+    rev_error = []
+    rev_code = {}
+    if claim_row.CLAIM_HOSP_REV_CD is not None:
+        rev_code_result = find_code(claim_row.CLAIM_HOSP_REV_CD, 'REV', 'CLAIM_HOSP_REV_CD')  # TODO: hardcoded value
+        rev_code = extract_code(rev_code_result)
+        rev_error = extract_left(*[rev_code_result])
+
     proc_code = extract_code(proc_code_result)
-    rev_code = extract_code(rev_code_result)
+
     validation_errors = extract_left(*[code_system_result,
                                        start_date_result,
                                        to_date_result,
-                                       proc_code_result,
-                                       rev_code_result])
+                                       proc_code_result])
+    validation_errors = validation_errors + rev_error
     valid = is_record_valid(validation_errors)
     validation_warnings = []
     warn = False
@@ -665,7 +672,7 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
             error = {'error': f'NPI is None',
                      'source_column_value': 'None',
                      'source_column_name': 'NPI'}
-            validation_warnings.append(json.dumps(error))
+            validation_warnings.append(error)
 
         # {'PROVIDER_ID': '10151134',
         #  'PROVIDER_TYP_ID': '1',
@@ -714,7 +721,7 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
             error = {'error': f'NPI is None',
                      'source_column_value': 'None',
                      'source_column_name': 'NPI'}
-            validation_warnings.append(json.dumps(error))
+            validation_warnings.append(error)
 
         ref_provider_row = Row(id=uuid.uuid4().hex[:12],
                                npi=cached_provider.get('NPI', None),
