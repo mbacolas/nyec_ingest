@@ -277,12 +277,12 @@ stage_patient_schema = StructType([
     StructField("dob", DateType()),
     StructField("gender_raw", StringType()),
     StructField("gender", StringType()),
-    StructField("error", ArrayType(StringType())),
-    StructField("warning", ArrayType(StringType())),
+    StructField("error", ArrayType(MapType(StringType(), StringType()))),
+    StructField("warning", ArrayType(MapType(StringType(), StringType()))),
     StructField("is_valid", BooleanType()),
     StructField("has_warnings", BooleanType()),
     StructField("batch_id", StringType()),
-    StructField("date_created", DateType())
+    StructField("date_created", StringType())
 ])
 
 stage_telcom_schema = StructType([

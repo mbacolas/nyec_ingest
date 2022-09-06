@@ -38,13 +38,13 @@ batch_id = conf.get("spark.nyec.iqvia.batch_id", generate_batch_id())
 # batch_id = conf.get("spark.nyec.iqvia.batch_id", uuid.uuid4().hex[:12])
 date_created = datetime.now()
 iqvia_processed_s3_prefix = conf.get("spark.nyec.iqvia.iqvia_processed_s3_prefix")
-
+raw_format_type = conf.get("spark.nyec.iqvia.file_format", 'csv')
 # sqlContext.setConf("spark.sql.parquet.compression.codec", "snappy")
 def generate_output_path(data_set_name: str) -> str:
     return f'{iqvia_processed_s3_prefix}/{data_set_name}/'
 
 
-load_df(spark, plan_load_path, raw_plan_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, plan_load_path, raw_plan_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('PLAN_ID')) \
@@ -53,7 +53,7 @@ load_df(spark, plan_load_path, raw_plan_schema, file_delimiter=file_parsing_deli
     .parquet(generate_output_path('plan'), mode='overwrite', compression='snappy')
 
 print('------------------------>>>>>>> saved plan')
-load_df(spark, patient_load_path, raw_patient_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, patient_load_path, raw_patient_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('PATIENT_ID'))\
@@ -61,7 +61,7 @@ load_df(spark, patient_load_path, raw_patient_schema, file_delimiter=file_parsin
     .write.parquet(generate_output_path('patient'), mode='overwrite', compression='snappy')
 print('------------------------>>>>>>> saved patient')
 
-load_df(spark, claim_load_path, raw_claim_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, claim_load_path, raw_claim_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('PATIENT_ID')) \
@@ -70,7 +70,7 @@ load_df(spark, claim_load_path, raw_claim_schema, file_delimiter=file_parsing_de
     .parquet(generate_output_path('factdx'), mode='overwrite', compression='snappy')
 
 print('------------------------>>>>>>> saved claim')
-load_df(spark, procedure_load_path, raw_procedure_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, procedure_load_path, raw_procedure_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('PRC_CD'))\
@@ -78,7 +78,7 @@ load_df(spark, procedure_load_path, raw_procedure_schema, file_delimiter=file_pa
     .write\
     .parquet(generate_output_path('procedure'), mode='overwrite', compression='snappy')
 print('------------------------>>>>>>> saved proc')
-load_df(spark, proc_modifier_load_path, raw_procedure_modifier_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, proc_modifier_load_path, raw_procedure_modifier_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('PRC_MODR_CD')) \
@@ -86,7 +86,7 @@ load_df(spark, proc_modifier_load_path, raw_procedure_modifier_schema, file_deli
     .write\
     .parquet(generate_output_path('proceduremodifier'), mode='overwrite', compression='snappy')
 print('------------------------>>>>>>> saved proc mod')
-load_df(spark, diagnosis_load_path, raw_diag_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, diagnosis_load_path, raw_diag_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('DIAG_CD')) \
@@ -94,7 +94,7 @@ load_df(spark, diagnosis_load_path, raw_diag_schema, file_delimiter=file_parsing
     .write\
     .parquet(generate_output_path('diagnosis'), mode='overwrite', compression='snappy')
 print('------------------------>>>>>>> saved diag')
-load_df(spark, drug_load_path, raw_drug_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, drug_load_path, raw_drug_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('NDC_CD')) \
@@ -103,7 +103,7 @@ load_df(spark, drug_load_path, raw_drug_schema, file_delimiter=file_parsing_deli
     .parquet(generate_output_path('product'), mode='overwrite', compression='snappy')
 print('------------------------>>>>>>> saved drug')
 
-load_df(spark, provider_load_path, raw_provider_schema, file_delimiter=file_parsing_delimiter) \
+load_df(spark, provider_load_path, raw_provider_schema, file_delimiter=file_parsing_delimiter, format_type = raw_format_type) \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
     .repartition(col('PROVIDER_ID')) \

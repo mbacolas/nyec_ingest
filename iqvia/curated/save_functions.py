@@ -1,3 +1,5 @@
+import json
+
 from pyspark import RDD
 from pyspark.sql import Row
 from pyspark.sql.functions import *
@@ -27,11 +29,20 @@ def save_errors(error_df: DataFrame, row_type: str, output_path: str):
         .map(lambda r: Row(batch_id=r.batch_id,
                            type=row_type,
                            row_errors=json.dumps(r.error),
+                           row_warnings=json.dumps(r.warning),
                            row_value=json.dumps(r.asDict()),
                            date_created=datetime.now())) \
         .toDF(error_schema) \
         .write \
         .parquet(output_path, mode='append', compression='snappy')
+
+    error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
+        .rdd \
+        .map(lambda r: Row(batch_id=r.batch_id,
+                           type=row_type,
+                           row_errors=json.dumps(r.error),
+                           row_warnings=json.dumps(r.warning),
+                           date_created=datetime.now().isoformat()))
         # .select('batch_id', 'date_created', 'error', 'source_consumer_id') \
         # .withColumn('row_type', lit(row_type)) \
         # .withColumn('row_errors', lit(json.dumps(col('error')))) \

@@ -93,8 +93,8 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    # return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
-    return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
+    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    # return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
 iqvia_processed_s3_prefix = Variable.get('iqvia_processed_s3_prefix')
@@ -207,7 +207,7 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
 
                      '--conf',
-                     f'spark.nyec.iqvia.file_format=parquet',
+                     f'spark.nyec.iqvia.file_format=csv',
 
                      '--conf',
                      f'spark.executor.memory=48g',
