@@ -23,8 +23,9 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 #         .write\
 #         .parquet(output_path, mode='append', compression='snappy')
 
-def save_errors(error_df: DataFrame, row_type: str, output_path: str):
+def save_errors(error_df: DataFrame, row_type: str, output_path: str, date_created: datetime):
     error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
+        .withColumn('date_created', lit(date_created.isoformat())) \
         .rdd\
         .map(lambda r: Row(batch_id=r.batch_id,
                            type=row_type,
@@ -35,19 +36,6 @@ def save_errors(error_df: DataFrame, row_type: str, output_path: str):
         .toDF(error_schema) \
         .write \
         .parquet(output_path, mode='append', compression='snappy')
-
-    error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
-        .rdd \
-        .map(lambda r: Row(batch_id=r.batch_id,
-                           type=row_type,
-                           row_errors=json.dumps(r.error),
-                           row_warnings=json.dumps(r.warning),
-                           date_created=datetime.now().isoformat()))
-        # .select('batch_id', 'date_created', 'error', 'source_consumer_id') \
-        # .withColumn('row_type', lit(row_type)) \
-        # .withColumn('row_errors', lit(json.dumps(col('error')))) \
-        # .withColumn('row_value', lit(map_values(error_df.properties))) \
-
 
 
         # .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
@@ -76,7 +64,7 @@ def save_run_meta(meta_df: DataFrame, output_path: str):
 
 
 def save_org(org_df: DataFrame, output_path: str):
-    org_df.select(  col('id'),
+    org_df.select( col('id'),
                     col('source_org_oid'),
                     col('name'),
                     col('type'),
