@@ -221,7 +221,7 @@ admitting_problem_df = to_admitting_diagnosis(patient_claims_raw_rdd) #.persist(
 save_errors(admitting_problem_df, ADMITTING_PROBLEM, generate_output_path('error'))
 save_errors(problem_df, PROBLEM, generate_output_path('error'))
 all_problem_df = problem_df.union(admitting_problem_df).persist(StorageLevel.MEMORY_AND_DISK)
-save_problem(all_problem_df)
+save_problem(all_problem_df, generate_output_path('problem'))
 
 all_problem_df.unpersist(False)
 problem_df.unpersist(False)

@@ -58,7 +58,7 @@ JOB_FLOW_OVERRIDES = {
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 3
+                "InstanceCount": 10
             }
         ],
         "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
@@ -216,7 +216,7 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.executor.cores=15',
 
                      '--conf',
-                     f'spark.sql.shuffle.partitions=6000',
+                     f'spark.sql.shuffle.partitions=3000',
 
                      '--conf',
                      f'spark.driver.memory=16G',
@@ -228,8 +228,8 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -XX:OnOutOfMemoryError=\'kill -9 %p\'',
                      # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
 
-                     '--conf',
-                     f'num-executors=12',
+                     # '--conf',
+                     # f'num-executors=12',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
