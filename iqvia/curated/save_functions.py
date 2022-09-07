@@ -10,6 +10,16 @@ from iqvia.common.schema import error_schema, stage_procedure__modifier_schema
 from pymonad.either import *
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, ArrayType, \
     MapType, BooleanType, DecimalType, TimestampType
+from datetime import datetime
+from datetime import date
+from json import JSONEncoder
+import json
+
+class DateTimeEncoder(JSONEncoder):
+    # Override the default method
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
 
 # def save_errors(rdd: RDD, row_type: str, output_path: str):
 #     rdd.filter(lambda r: r.is_valid == False or r.has_warnings == True) \
@@ -23,14 +33,7 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 #         .write\
 #         .parquet(output_path, mode='append', compression='snappy')
 
-def save_errors(error_df: DataFrame, row_type: str, output_path: str, date_created: datetime):
-    from json import JSONEncoder
-    class DateTimeEncoder(JSONEncoder):
-        # Override the default method
-        def default(self, obj):
-            if isinstance(obj, (datetime.date, datetime.datetime)):
-                return obj.isoformat()
-
+def save_errors(error_df: DataFrame, row_type: str, output_path: str):
     error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
         .rdd\
         .map(lambda r: Row(batch_id=r.batch_id,
