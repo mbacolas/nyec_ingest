@@ -31,7 +31,8 @@ def str_to_date(date_raw: str, source_column_name: str, is_required=True, date_f
 #TODO: REMOVE once ref data is loaded
 def tmp_function(code_system_raw: str, code_raw:str):
     search_key = f'{code_raw}:{code_system_raw}'
-    if code_system_raw is None or (code_raw is None or code_raw == '-1'):
+    if code_system_raw is None or (code_raw is None or (code_raw.isnumeric() and int(code_raw) < 10) or (not code_raw.isnumeric() and len(code_raw) < 3)):
+    # if code_system_raw is None or (code_raw is None or code_raw == '-1' or '00000' in code_raw):
         return None
     else:
         return {'code': search_key.split(':')[0], 'code_system': search_key.split(':')[1], 'desc': 'UNKNOWN'}

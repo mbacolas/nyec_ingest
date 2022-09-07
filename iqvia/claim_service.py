@@ -33,10 +33,10 @@ def patient_id() -> str:
 
 
 def patient_zip() -> str:
-    return random.randrange(100, 999)
+    return str(random.randrange(100, 999))
 
 
-def claim_id() -> int:
+def claim_id() -> str:
     return str(uuid.uuid4().int)[:12]
 
 

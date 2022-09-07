@@ -14,6 +14,7 @@ from datetime import datetime
 from datetime import date
 from json import JSONEncoder
 import json
+import uuid
 
 class DateTimeEncoder(JSONEncoder):
     # Override the default method
@@ -33,11 +34,15 @@ class DateTimeEncoder(JSONEncoder):
 #         .write\
 #         .parquet(output_path, mode='append', compression='snappy')
 
+
 def save_errors(error_df: DataFrame, row_type: str, output_path: str):
     error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
         .rdd\
-        .map(lambda r: Row(batch_id=r.batch_id,
+        .map(lambda r: Row(id=uuid.uuid4().hex[:12],
+                           batch_id=r.batch_id,
                            type=row_type,
+                           is_valid=r.is_valid,
+                           has_warnings=r.has_warnings,
                            row_errors=json.dumps(r.error),
                            row_warnings=json.dumps(r.warning),
                            row_value=json.dumps(r.asDict(), indent=4, cls=DateTimeEncoder),

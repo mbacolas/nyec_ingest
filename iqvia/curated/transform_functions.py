@@ -265,11 +265,10 @@ def _to_admitting_diagnosis(claim_row: Row) -> Row:
     diag_code = extract_code(diag_code_result)
     validation_errors = extract_left(*[all_code_system_result,
                                        start_date_result,
-                                       to_date_result,
                                        diag_code_result])
+    validation_warnings = extract_left(*[to_date_result])
     valid = is_record_valid(validation_errors)
-    validation_warnings = []
-    warn = False
+    warn = not is_record_valid(validation_warnings)
 
     diag_row = Row(id=uuid.uuid4().hex[:12],
                    primary=None,

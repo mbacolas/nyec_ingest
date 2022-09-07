@@ -11,6 +11,7 @@ from datetime import datetime
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
 PROBLEM = 'PROBLEM'
+ADMITTING_PROBLEM = 'ADMITTING_PROBLEM'
 DRUG = 'DRUG'
 COST = 'COST'
 CLAIM = 'CLAIM'
@@ -176,18 +177,18 @@ def ref_lookup(event_type: str, key: str):
 
 
 ### create stage patient DF
-# patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
-#     .withColumn('source_org_oid', lit('IQVIA')) \
-#     .withColumn('date_created', lit(date_created)) \
-#     .rdd
-#
-# currated_patient_df = to_patient(patient_rdd, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
-#
-# # currated_patient_df = currated_patient_rdd.toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
-# save_patient(currated_patient_df, generate_output_path('patient'))
-# save_errors(currated_patient_df, PATIENT, generate_output_path('error'))
-#
-# currated_patient_df.unpersist()
+patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
+    .withColumn('source_org_oid', lit('IQVIA')) \
+    .withColumn('date_created', lit(date_created)) \
+    .rdd
+
+currated_patient_df = to_patient(patient_rdd, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+
+# currated_patient_df = currated_patient_rdd.toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
+save_patient(currated_patient_df, generate_output_path('patient'))
+save_errors(currated_patient_df, PATIENT, generate_output_path('error'))
+
+currated_patient_df.unpersist()
 
 print('------------------------>>>>>>> saved patient <<<--- ')
 
@@ -202,24 +203,26 @@ patient_claims_raw_rdd = raw_patient_df \
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
 ### create procedure
-# procedure_df = to_procedure(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
-# save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
-# save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
-# # currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
-# save_procedure(procedure_df, generate_output_path('procedure'))
-# procedure_df.unpersist(False)
-# # procedure_rdd.unpersist(False)
-# raw_patient_df.unpersist()
-# raw_claim_df.unpersist()
+procedure_df = to_procedure(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
+save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
+# currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
+save_procedure(procedure_df, generate_output_path('procedure'))
+procedure_df.unpersist(False)
+# procedure_rdd.unpersist(False)
+raw_patient_df.unpersist()
+raw_claim_df.unpersist()
 
 print('------------------------>>>>>>> saved procs')
 #
 # ### problems
 problem_df = to_problem(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size) #.persist(StorageLevel.MEMORY_AND_DISK)
 admitting_problem_df = to_admitting_diagnosis(patient_claims_raw_rdd) #.persist(StorageLevel.MEMORY_AND_DISK)
+save_errors(admitting_problem_df, ADMITTING_PROBLEM, generate_output_path('error'))
+save_errors(problem_df, PROBLEM, generate_output_path('error'))
 all_problem_df = problem_df.union(admitting_problem_df).persist(StorageLevel.MEMORY_AND_DISK)
+save_problem(all_problem_df)
 
-save_errors(all_problem_df, PROBLEM, generate_output_path('error'))
 all_problem_df.unpersist(False)
 problem_df.unpersist(False)
 admitting_problem_df.unpersist(False)

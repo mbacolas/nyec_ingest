@@ -183,8 +183,11 @@ stage_problem_schema = StructType([
 ])
 
 error_schema = StructType([
+    StructField("id", StringType()),
     StructField("batch_id", StringType()),
     StructField("type", StringType()),
+    StructField("is_valid", BooleanType()),
+    StructField("has_warnings", BooleanType()),
     StructField("row_errors", StringType()),
     StructField("row_warnings", StringType()),
     StructField("row_value", StringType()),
