@@ -230,8 +230,8 @@ def _to_problem_row(claim_row: Row, ref_lookup) -> Row:
 def to_problem(claim_rdd: RDD, ref_lookup, df_partition_size=6000) -> DataFrame:
     return claim_rdd \
         .map(lambda r: _to_problem_row(r, ref_lookup)) \
-        .toDF(df_partition_size) \
-        .repartition(6000, 'source_consumer_id',
+        .toDF(stage_problem_schema) \
+        .repartition(df_partition_size, 'source_consumer_id',
                      'start_date',
                      'code_raw',
                      'code_system_raw') \

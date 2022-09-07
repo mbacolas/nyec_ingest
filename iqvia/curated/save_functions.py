@@ -24,14 +24,20 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 #         .parquet(output_path, mode='append', compression='snappy')
 
 def save_errors(error_df: DataFrame, row_type: str, output_path: str, date_created: datetime):
+    from json import JSONEncoder
+    class DateTimeEncoder(JSONEncoder):
+        # Override the default method
+        def default(self, obj):
+            if isinstance(obj, (datetime.date, datetime.datetime)):
+                return obj.isoformat()
+
     error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
-        .withColumn('date_created', lit(date_created.isoformat())) \
         .rdd\
         .map(lambda r: Row(batch_id=r.batch_id,
                            type=row_type,
                            row_errors=json.dumps(r.error),
                            row_warnings=json.dumps(r.warning),
-                           row_value=json.dumps(r.asDict()),
+                           row_value=json.dumps(r.asDict(), indent=4, cls=DateTimeEncoder),
                            date_created=datetime.now())) \
         .toDF(error_schema) \
         .write \
