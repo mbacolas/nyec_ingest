@@ -156,14 +156,14 @@ def to_procedure(claim_rdd: RDD, ref_lookup, df_partition_size=6000) -> DataFram
         .filter(lambda r: r.PRC_CD is not None) \
         .map(lambda r: _to_procedure_row(r, ref_lookup)) \
         .toDF(stage_procedure_schema) \
-        .repartition(df_partition_size, 'source_consumer_id',
-                     'start_date',
-                     'code_raw',
-                     'code_system_raw') \
-        .sortWithinPartitions('source_consumer_id',
-                              'start_date',
-                              'code_raw',
-                              'code_system_raw') \
+        # .repartition(df_partition_size, 'source_consumer_id',
+        #              'start_date',
+        #              'code_raw',
+        #              'code_system_raw') \
+        # .sortWithinPartitions('source_consumer_id',
+        #                       'start_date',
+        #                       'code_raw',
+        #                       'code_system_raw') \
         .dropDuplicates(['source_consumer_id',
                          'start_date',
                          'code_raw',

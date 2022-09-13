@@ -30,6 +30,8 @@ spark = SparkSession \
 conf = spark.conf
 sqlContext = SQLContext(spark)
 
+import dbutils
+access_key = dbutils.secrets.get(scope = "aws", key = "aws-access-key")
 
 def generate_batch_id():
     from datetime import date

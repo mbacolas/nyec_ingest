@@ -4,16 +4,12 @@ from airflow import DAG
 import boto3
 from airflow.operators.python import PythonOperator
 
-from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
-# from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
-# from airflow.providers.amazon.aws.sensors.emr import EmrStepSensor
-
 
 # from airflow.providers.amazon.aws.operators.e import EmrTerminateJobFlowOperator
-# from airflow.providers.amazon.aws.operators.emr_create_job_flow import EmrCreateJobFlowOperator
-# from airflow.providers.amazon.aws.operators.emr_add_steps import EmrAddStepsOperator
+from airflow.providers.amazon.aws.operators.emr_create_job_flow import EmrCreateJobFlowOperator
+from airflow.providers.amazon.aws.operators.emr_add_steps import EmrAddStepsOperator
 
-from airflow.providers.amazon.aws.sensors.emr_step import EmrStepSensor
+# from airflow.providers.amazon.aws.sensors.emr_step import EmrStepSensor
 from airflow.providers.amazon.aws.operators import glue_crawler
 from airflow.providers.amazon.aws.transfers import s3_to_redshift
 from airflow.providers.amazon.aws.transfers.s3_to_redshift import *
@@ -53,12 +49,12 @@ JOB_FLOW_OVERRIDES = {
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
                 # "InstanceType": "r5.xlarge",
-                # "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
-                "InstanceType": "m5d.12xlarge",
+                "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
+                # "InstanceType": "m5d.12xlarge", #48	192
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 10
+                "InstanceCount": 1
             }
         ],
         "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
@@ -116,29 +112,9 @@ TO_PROCESSED_SPARK_STEPS = [
             'Jar': 'command-runner.jar',
             'Args': ['spark-submit',
                      '--conf',
-                     f'spark.nyec.iqvia.raw_plan_ingest_path={generate_date_path("plan")}',
-                     '--conf',
                      f'spark.nyec.iqvia.raw_patient_ingest_path={generate_date_path("patient")}',
                     '--conf',
                      f'spark.nyec.iqvia.raw_claim_ingest_path={generate_date_path("factdx")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_procedure_ingest_path={generate_date_path("procedure")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_procedure_modifier_ingest_path={generate_date_path("proceduremodifier")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_diagnosis_ingest_path={generate_date_path("diagnosis")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_drug_ingest_path={generate_date_path("product")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_pro_provider_ingest_path={generate_date_path("professionalprovidertier")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("provider")}',
 
                     '--conf',
                      f'spark.nyec.iqvia.iqvia_processed_s3_prefix={iqvia_processed_s3_prefix}',
@@ -147,98 +123,17 @@ TO_PROCESSED_SPARK_STEPS = [
                      f'spark.executor.memory=25g',
 
                      '--conf',
-                     f'spark.executor.cores=35',
-
-                     # '--conf',
-                     # f'num-executors=6',
+                     f'spark.executor.cores=10',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
 
-                     '/home/hadoop/iqvia_raw_to_parquet_processor.py'
+                     '/home/hadoop/iqvia_gzip_to_csv_processor.py'
                      ]
         }
     }
 ]
 
-TO_CURATED_SPARK_STEPS = [
-    {
-        'Name': 'setup - copy files',
-        'ActionOnFailure': 'CANCEL_AND_WAIT',
-        'HadoopJarStep': {
-            'Jar': 'command-runner.jar',
-            'Args': ['aws', 's3', 'cp', '--recursive', S3_URI, '/home/hadoop/']
-        }
-    },
-    {
-        'Name': 'Run Spark',
-        'ActionOnFailure': 'CANCEL_AND_WAIT',
-        'HadoopJarStep': {
-            'Jar': 'command-runner.jar',
-            'Args': ['spark-submit',
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_plan_ingest_path={generate_date_path("plan")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_patient_ingest_path={generate_date_path("patient")}',
-
-                    '--conf',
-                     f'spark.nyec.iqvia.raw_claim_ingest_path={generate_date_path("factdx")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_procedure_ingest_path={generate_date_path("procedure")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_procedure_modifier_ingest_path={generate_date_path("proceduremodifier")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_diagnosis_ingest_path={generate_date_path("diagnosis")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_drug_ingest_path={generate_date_path("product")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.pro_provider_ingest_path={generate_date_path("professionalprovidertier")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.raw_provider_ingest_path={generate_date_path("provider")}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.iqvia_curated_s3_prefix={iqvia_curated_s3_prefix}',
-
-                     '--conf',
-                     f'spark.nyec.iqvia.file_format=csv',
-
-                     '--conf',
-                     f'spark.executor.memory=48g',
-
-                     '--conf',
-                     f'spark.executor.cores=15',
-
-                     '--conf',
-                     f'spark.sql.shuffle.partitions=3000',
-
-                     '--conf',
-                     f'spark.driver.memory=16G',
-
-                     '--conf',
-                     f'spark.driver.cores=4',
-
-                     '--conf',
-                     f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -XX:OnOutOfMemoryError=\'kill -9 %p\'',
-                     # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
-
-                     # '--conf',
-                     # f'num-executors=12',
-
-                     '--py-files',
-                     '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
-                     
-                     '/home/hadoop/staging_ingest_processor.py'
-                     ]
-        }
-    }
-]
 
 # '--conf',
 # f'spark.sql.files.maxPartitionBytes=268435456',
@@ -256,28 +151,22 @@ default_args = {
     'schedule_interval': None
 }
 
-mannys_emr_iqvia_ingest_flow = DAG(
-    'mannys_emr_iqvia_ingest_flow',
+decompress_iqvia_ingest_flow = DAG(
+    'decompress_iqvia_ingest_flow',
     default_args=default_args,
     dagrun_timeout=timedelta(hours=2),
     max_active_runs=1
     # schedule_interval=timedelta(minutes=10)
 )
 
-# create_processed_emr_cluster = EmrCreateJobFlowOperator(
-#     task_id='create_processed_emr_cluster',
-#     job_flow_overrides=JOB_FLOW_OVERRIDES,
-#     aws_conn_id='aws_default',
-#     emr_conn_id='emr_test',
-#     dag=emr_dag
-# )
+
 
 create_emr_cluster = EmrCreateJobFlowOperator(
     task_id='create_emr_cluster',
     job_flow_overrides=JOB_FLOW_OVERRIDES,
     aws_conn_id='aws_default',
     emr_conn_id='emr_test',
-    dag=mannys_emr_iqvia_ingest_flow
+    dag=decompress_iqvia_ingest_flow
 )
 
 # trigger_processed_emr_job = EmrAddStepsOperator(
@@ -292,14 +181,14 @@ trigger_curated_emr_job = EmrAddStepsOperator(
     task_id='trigger_curated_emr_job',
     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
     aws_conn_id='aws_default',
-    steps=TO_CURATED_SPARK_STEPS,
-    dag=mannys_emr_iqvia_ingest_flow
+    steps=TO_PROCESSED_SPARK_STEPS,
+    dag=decompress_iqvia_ingest_flow
 )
 
-cluster_remover = EmrTerminateJobFlowOperator(
-    task_id='remove_cluster',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
-)
+# cluster_remover = EmrTerminateJobFlowOperator(
+#     task_id='remove_cluster',
+#     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+# )
 
 # step_checker = EmrStepSensor(
 #     task_id='watch_step',

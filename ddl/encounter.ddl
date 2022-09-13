@@ -52,24 +52,24 @@ CREATE EXTERNAL TABLE `cost`(
 CREATE EXTERNAL TABLE problem
 (
   id int identity(0,1),
-  `primary` boolean,
-  `clinical_status` string,
-  `severity` string,
-  `onset_date` date,
-  `onset_age` int,
-  `abatement_date` date,
-  `abatement_age` int,
-  `source_consumer_id` string,
-  `source_org_oid` string,
-  `start_date` date,
-  `to_date` date,
-  `code` string,
-  `code_system` string,
-  `desc` string,
-  `source_desc` string,
-  `is_admitting` boolean,
-  `batch_id` string,
-  `date_created` date
+  is_primary boolean,
+  clinical_status string,
+  severity string,
+  onset_date date,
+  onset_age int,
+  abatement_date date,
+  abatement_age int,
+  source_consumer_id string,
+  source_org_oid string,
+  start_date date,
+  to_date date,
+  code string,
+  code_system string,
+  desc string,
+  source_desc string,
+  is_admitting boolean,
+  batch_id string,
+  date_created date
 )
 
 CREATE EXTERNAL TABLE `procedure`(
