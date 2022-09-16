@@ -151,19 +151,11 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
 #     .reduceByKey((lambda a, b: a)) \
 #     .map(lambda r: r[1]) \
 
-def to_procedure(claim_rdd: RDD, ref_lookup, df_partition_size=6000) -> DataFrame:
+def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd \
         .filter(lambda r: r.PRC_CD is not None) \
         .map(lambda r: _to_procedure_row(r, ref_lookup)) \
         .toDF(stage_procedure_schema) \
-        # .repartition(df_partition_size, 'source_consumer_id',
-        #              'start_date',
-        #              'code_raw',
-        #              'code_system_raw') \
-        # .sortWithinPartitions('source_consumer_id',
-        #                       'start_date',
-        #                       'code_raw',
-        #                       'code_system_raw') \
         .dropDuplicates(['source_consumer_id',
                          'start_date',
                          'code_raw',
@@ -441,9 +433,9 @@ def _to_patient_row(patient_plan: Row) -> Row:
                       race=None,
                       deceased=None,
                       marital_status=None,
-                      phone=None,
-                      email=None,
-                      address=None,
+                      # phone=None,
+                      # email=None,
+                      # address=None,
                       source_consumer_id=patient_plan.PATIENT_ID,
                       source_org_oid=patient_plan.source_org_oid,
                       type=patient_plan.consumer_type,
@@ -461,12 +453,10 @@ def _to_patient_row(patient_plan: Row) -> Row:
     return patient_row
 
 
-def to_patient(patient_plan_rdd: RDD, df_partition_size=6000) -> DataFrame:
+def to_patient(patient_plan_rdd: RDD) -> DataFrame:
     return patient_plan_rdd \
         .map(lambda r: _to_patient_row(r)) \
         .toDF(stage_patient_schema) \
-        .repartition(df_partition_size, col('source_consumer_id')) \
-        .sortWithinPartitions('source_consumer_id') \
         .dropDuplicates(['source_consumer_id']) \
         # .persist(StorageLevel.MEMORY_AND_DISK)
     # .keyBy(lambda r: (r.source_consumer_id)) \

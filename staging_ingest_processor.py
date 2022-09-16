@@ -30,8 +30,6 @@ spark = SparkSession \
 conf = spark.conf
 sqlContext = SQLContext(spark)
 
-import dbutils
-access_key = dbutils.secrets.get(scope = "aws", key = "aws-access-key")
 
 def generate_batch_id():
     from datetime import date
@@ -104,17 +102,12 @@ raw_plan_df = load_plan(spark, plan_path, raw_plan_schema, file_format)\
 
 raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_format) \
     .withColumn('PATIENT_SALT', (100*rand()).cast(IntegerType()))\
-    .repartition(partition_size, 'PATIENT_ID') \
-    .sortWithinPartitions('PATIENT_ID') \
     .persist(StorageLevel.MEMORY_AND_DISK)
 
 # .withColumn('SALT', (10*rand()).cast(IntegerType()))\
 # .limit(10 * 1000 * 1000)\
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format)\
-    .withColumn('CLAIM_SALT', (100*rand()).cast(IntegerType()))\
-    .repartition(partition_size, 'PATIENT_ID_CLAIM') \
-    .sortWithinPartitions('PATIENT_ID_CLAIM') \
-    .persist(StorageLevel.MEMORY_AND_DISK)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format).limit(100)
+    # .persist(StorageLevel.MEMORY_AND_DISK)
 
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
 raw_diag_df = load_diagnosis(spark, diagnosis_path, raw_diag_schema, file_format)
@@ -172,7 +165,7 @@ ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PR
 print('------------------------>>>>>>> broadcasting reference data')
 broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 
-
+@udf(returnType=MapType(StringType(), StringType()))
 def ref_lookup(event_type: str, key: str):
     return broadcast_cache.value[event_type].get(key, {})
 
@@ -182,14 +175,16 @@ def ref_lookup(event_type: str, key: str):
 patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
     .withColumn('source_org_oid', lit('IQVIA')) \
     .withColumn('date_created', lit(date_created)) \
-    .rdd
+    .rdd\
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
-currated_patient_df = to_patient(patient_rdd, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+currated_patient_df = to_patient(patient_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 
 # currated_patient_df = currated_patient_rdd.toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_patient(currated_patient_df, generate_output_path('patient'))
 save_errors(currated_patient_df, PATIENT, generate_output_path('error'))
 
+patient_rdd.unpersist()
 currated_patient_df.unpersist()
 
 print('------------------------>>>>>>> saved patient <<<--- ')
@@ -200,12 +195,13 @@ patient_claims_raw_rdd = raw_patient_df \
     .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
     .withColumn('batch_id', lit(batch_id)) \
     .withColumn('date_created', lit(date_created)) \
-    .rdd
+    .rdd\
+    .persist(StorageLevel.MEMORY_AND_DISK)
 
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
 ### create procedure
-procedure_df = to_procedure(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+procedure_df = to_procedure(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
 save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
 save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
 # currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
@@ -216,85 +212,85 @@ raw_patient_df.unpersist()
 raw_claim_df.unpersist()
 
 print('------------------------>>>>>>> saved procs')
+# #
+# # ### problems
+# problem_df = to_problem(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size) #.persist(StorageLevel.MEMORY_AND_DISK)
+# admitting_problem_df = to_admitting_diagnosis(patient_claims_raw_rdd) #.persist(StorageLevel.MEMORY_AND_DISK)
+# save_errors(admitting_problem_df, ADMITTING_PROBLEM, generate_output_path('error'))
+# save_errors(problem_df, PROBLEM, generate_output_path('error'))
+# all_problem_df = problem_df.union(admitting_problem_df).persist(StorageLevel.MEMORY_AND_DISK)
+# save_problem(all_problem_df, generate_output_path('problem'))
 #
-# ### problems
-problem_df = to_problem(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size) #.persist(StorageLevel.MEMORY_AND_DISK)
-admitting_problem_df = to_admitting_diagnosis(patient_claims_raw_rdd) #.persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(admitting_problem_df, ADMITTING_PROBLEM, generate_output_path('error'))
-save_errors(problem_df, PROBLEM, generate_output_path('error'))
-all_problem_df = problem_df.union(admitting_problem_df).persist(StorageLevel.MEMORY_AND_DISK)
-save_problem(all_problem_df, generate_output_path('problem'))
-
-all_problem_df.unpersist(False)
-problem_df.unpersist(False)
-admitting_problem_df.unpersist(False)
-print('------------------------>>>>>>> saved problems')
-####
-
-
-### drug
-drug_df = to_drug(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(drug_df, DRUG, generate_output_path('error'))
-save_drug(drug_df, generate_output_path('drug'))
-# drug_rdd.unpersist(False)
-####
-print('------------------------>>>>>>> saved drugs')
+# all_problem_df.unpersist(False)
+# problem_df.unpersist(False)
+# admitting_problem_df.unpersist(False)
+# print('------------------------>>>>>>> saved problems')
+# ####
 #
 #
-# ### cost
-cost_df = to_cost(patient_claims_raw_rdd, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(cost_df, COST, generate_output_path('error'))
-save_cost(cost_df, generate_output_path('cost'))
-# cost_rdd.unpersist(False)
-####
-print('------------------------>>>>>>> saved cost')
+# ### drug
+# drug_df = to_drug(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+# save_errors(drug_df, DRUG, generate_output_path('error'))
+# save_drug(drug_df, generate_output_path('drug'))
+# # drug_rdd.unpersist(False)
+# ####
+# print('------------------------>>>>>>> saved drugs')
+# #
+# #
+# # ### cost
+# cost_df = to_cost(patient_claims_raw_rdd, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+# save_errors(cost_df, COST, generate_output_path('error'))
+# save_cost(cost_df, generate_output_path('cost'))
+# # cost_rdd.unpersist(False)
+# ####
+# print('------------------------>>>>>>> saved cost')
+# #
+# #
+# # ### claim
+# claim_record_df = to_claim(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+# save_errors(claim_record_df, CLAIM, generate_output_path('error'))
+# save_claim(claim_record_df, generate_output_path('claim'))
+# # claim_record_rdd.unpersist(False)
+# ###
+# print('------------------------>>>>>>> saved claim')
 #
 #
-# ### claim
-claim_record_df = to_claim(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(claim_record_df, CLAIM, generate_output_path('error'))
-save_claim(claim_record_df, generate_output_path('claim'))
-# claim_record_rdd.unpersist(False)
-###
-print('------------------------>>>>>>> saved claim')
-
-
-### org
-save_org(org_df, generate_output_path('org'))
-# org_df.unpersist()
-###
-
-
-### provider
-practitioner_df = to_practitioner(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(practitioner_df, PRACTIONER, generate_output_path('error'))
-# practitioner_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
-practitioner_role_df = to_practitioner_role(practitioner_df)
-save_provider(practitioner_df, generate_output_path('provider'))
-save_provider_role(practitioner_role_df, generate_output_path('provider_role'))
-
-patient_claims_raw_rdd.unpersist(False)
-# practitioner_rdd.unpersist(False)
-# currated_practitioner_role_df.unpersist(False)
-###
-
-file_paths = {'plan': plan_path,
-              'patient': patient_path,
-              'claim': claim_path,
-              'procedure': procedure_path,
-              'proc_modifier': proc_modifier_path,
-              'diagnosis': diagnosis_path,
-              'drug': drug_path,
-              'provider': provider_path}
-
-start = datetime.now()
-end = datetime.now()
-total = end - start
-duration = timedelta(seconds=total.total_seconds())
-columns = ['data_source', 'run_date', 'batch_id', 'file_paths', 'duration', 'start', 'end']
-data = [('IQVIA', datetime.now(), batch_id, json.dumps(file_paths), str(duration), start, end)]
-run_meta_df = spark.sparkContext.parallelize(data).toDF(curated_ingest_run_schema)
-save_run_meta(run_meta_df, generate_output_path('run_history'))
+# ### org
+# save_org(org_df, generate_output_path('org'))
+# # org_df.unpersist()
+# ###
+#
+#
+# ### provider
+# practitioner_df = to_practitioner(patient_claims_raw_rdd, ref_lookup, df_partition_size=partition_size).persist(StorageLevel.MEMORY_AND_DISK)
+# save_errors(practitioner_df, PRACTIONER, generate_output_path('error'))
+# # practitioner_df = practitioner_rdd.toDF(stage_provider_schema).persist(StorageLevel.MEMORY_AND_DISK)
+# practitioner_role_df = to_practitioner_role(practitioner_df)
+# save_provider(practitioner_df, generate_output_path('provider'))
+# save_provider_role(practitioner_role_df, generate_output_path('provider_role'))
+#
+# patient_claims_raw_rdd.unpersist(False)
+# # practitioner_rdd.unpersist(False)
+# # currated_practitioner_role_df.unpersist(False)
+# ###
+#
+# file_paths = {'plan': plan_path,
+#               'patient': patient_path,
+#               'claim': claim_path,
+#               'procedure': procedure_path,
+#               'proc_modifier': proc_modifier_path,
+#               'diagnosis': diagnosis_path,
+#               'drug': drug_path,
+#               'provider': provider_path}
+#
+# start = datetime.now()
+# end = datetime.now()
+# total = end - start
+# duration = timedelta(seconds=total.total_seconds())
+# columns = ['data_source', 'run_date', 'batch_id', 'file_paths', 'duration', 'start', 'end']
+# data = [('IQVIA', datetime.now(), batch_id, json.dumps(file_paths), str(duration), start, end)]
+# run_meta_df = spark.sparkContext.parallelize(data).toDF(curated_ingest_run_schema)
+# save_run_meta(run_meta_df, generate_output_path('run_history'))
 
 ############################ START DRUGS
 # drug_rdd = to_drug(claim_rdd).persist(StorageLevel.MEMORY_AND_DISK)
@@ -393,16 +389,80 @@ save_run_meta(run_meta_df, generate_output_path('run_history'))
 #     .withColumn("PATIENT_ID_RAW", when(patient_raw.PATIENT_ID == "10","ICD10").otherwise('MANNY'))\
 #     .withColumnRenamed('PATIENT_ID_RAW', 'sour_pat_id')
 #
+@udf(returnType=StringType())
+def to_dob(year: int) -> date:
+    dob = str(year)+'-01-01'
+    return datetime.strptime(dob, "%Y-%m-%d").date()
+
+udf_star_desc = udf(lambda year:to_dob(year),DateType())
+
+@udf(returnType=ArrayType(StringType()))
+def test_row(from_date, to_date, code, code_system_version):
+    return ['error1', 'error2']
+
 # @udf(returnType=StringType())
-# def to_dob(year: int) -> date:
-#     dob = str(year)+'-01-01'
-#     return datetime.strptime(dob, "%Y-%m-%d").date()
-#
-# udf_star_desc = udf(lambda year:to_dob(year),DateType())
-# #
-# # test = claims_raw.select(col('CLAIM_ID'), col('SVC_NBR'), col('CLAIM_TYP_CD'), col('SVC_FR_DT'), col('SVC_TO_DT'), col('HOSP_ADMT_DT'))
-# test.withColumn("CLAIM_TYP_CD",udf_star_desc(col("CLAIM_TYP_CD")))  #.select(col('CLAIM_ID'), col('SVC_NBR'), col('CLAIM_TYP_CD'), col('SVC_FR_DT'), col('SVC_TO_DT')).first()
-# # test.withColumn("CLAIM_TYP_CD",func1("CLAIM_TYP_CD"))
+# # def check_code(code, code_system_version, ref_func):
+# def check_code(result):
+#     print(result)
+#     return result.get('PRC_CD', 'None')
+
+@udf(returnType=StringType())
+def get_code_system(code, code_system_version):
+    return code
+
+@udf(returnType=DateType())
+def to_date(str_date, col_name):
+    return str_to_date(str_date, col_name).value
+
+# str_to_date('20200410', 'sdfsdf').value
+
+def working_fun(mapping_broadcasted):
+    def f(x, y):
+        if x is None:
+            x = ''
+
+        if y is None:
+            y = ''
+        print(x)
+        print(y)
+        k = x+':'+y
+        return mapping_broadcasted.value.get(k, {}).get('PRC_CD', None)
+    return udf(f)
+
+proc_cache_broadcast = spark.sparkContext.broadcast(proc_cache)
+
+udf_test_row = udf(lambda from_date, to_date, code, code_system_version:test_row(from_date, to_date, code, code_system_version),ArrayType(StringType()))
+udf_check_code = udf(lambda code, code_system:check_code(code, code_system, ref_lookup),StringType())
+udf_code_system_code = udf(lambda code, code_system:get_code_system(code, code_system),StringType())
+udf_test = udf(lambda code:test_func(code),StringType())
+raw_claim_df.withColumn("CLAIM_TYP_CD_NEW",test_func("CLAIM_TYP_CD")).show()
+
+import pyspark.sql.functions as F
+
+proc_df = \
+raw_claim_df.select(col('CLAIM_ID'),
+                     col('SVC_NBR'),
+                     col('CLAIM_TYP_CD'),
+                     col('SVC_FR_DT'),
+                     col('SVC_TO_DT'),
+                     col('PRC_CD'),
+                     col('PRC_VERS_TYP_ID'),
+                     col('CLAIM_HOSP_REV_CD'),
+                     col('PRC1_MODR_CD'),
+                     col('PRC3_MODR_CD'),
+                     col('PRC4_MODR_CD'))\
+                    .withColumn('code', working_fun(proc_cache_broadcast)(col('PRC_CD'), col('PRC_VERS_TYP_ID'))  ).show()
+                    # .withColumn('code', check_code( proc_cache.get(col('PRC_CD')+':'+col('PRC_VERS_TYP_ID')) ) ).show()
+.withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
+                    # .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
+
+                        .withColumn('code', check_code(col('PRC_CD'), col('PRC_VERS_TYP_ID'))) \
+                        .withColumn('code_system', get_code_system(col('PRC_CD'), col('PRC_VERS_TYP_ID')))\
+                        .withColumn('error', test_row(col('SVC_FR_DT'), col('SVC_TO_DT'), col('PRC_CD'), col('PRC_VERS_TYP_ID')))
+
+proc_df.withColumn()
+test.withColumn("CLAIM_TYP_CD",udf_star_desc(col("CLAIM_TYP_CD")))  #.select(col('CLAIM_ID'), col('SVC_NBR'), col('CLAIM_TYP_CD'), col('SVC_FR_DT'), col('SVC_TO_DT')).first()
+test.withColumn("CLAIM_TYP_CD",func1("CLAIM_TYP_CD"))
 # # claims_raw.withColumn(col('CLAIM_ID'), lambda x: 'ABC')
 # #
 #

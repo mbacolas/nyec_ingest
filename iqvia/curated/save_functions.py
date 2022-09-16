@@ -138,7 +138,7 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('source_desc'),
                 col('batch_id'),
                 col('date_created')) \
-        .repartition(6000, col('source_consumer_id'))\
+        .repartition(col('source_consumer_id'))\
         .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
         .write\
         .parquet(output_path, mode='overwrite', compression='snappy')
@@ -158,7 +158,7 @@ def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str)
                                                                      batch_id=r.batch_id,
                                                                      date_created=r.date_created), r.mod))\
                                 .toDF(stage_procedure__modifier_schema) \
-                                .repartition(6000, col('source_consumer_id')) \
+                                .repartition(col('source_consumer_id')) \
                                 .sortWithinPartitions(col('source_consumer_id'),
                                                       col('code_system'),
                                                       col('code'),

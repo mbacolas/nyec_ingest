@@ -4,14 +4,14 @@ from airflow import DAG
 import boto3
 from airflow.operators.python import PythonOperator
 
-from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
+# from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
 # from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
 # from airflow.providers.amazon.aws.sensors.emr import EmrStepSensor
 
 
 # from airflow.providers.amazon.aws.operators.e import EmrTerminateJobFlowOperator
-# from airflow.providers.amazon.aws.operators.emr_create_job_flow import EmrCreateJobFlowOperator
-# from airflow.providers.amazon.aws.operators.emr_add_steps import EmrAddStepsOperator
+from airflow.providers.amazon.aws.operators.emr_create_job_flow import EmrCreateJobFlowOperator
+from airflow.providers.amazon.aws.operators.emr_add_steps import EmrAddStepsOperator
 
 from airflow.providers.amazon.aws.sensors.emr_step import EmrStepSensor
 from airflow.providers.amazon.aws.operators import glue_crawler
@@ -23,8 +23,8 @@ execution_date = "{{ execution_date }}"
 S3_BUCKET_NAME = 'nyec-scripts'
 AWS_REGION = "us-east-1"
 ssm_client = boto3.client("ssm", region_name=AWS_REGION)
-# subnetID = 'subnet-00031e4e4cd2b33a4'
-subnetID = ssm_client.get_parameter(Name='/nyec/dev/subnetID')
+subnetID = 'subnet-00031e4e4cd2b33a4'
+# subnetID = ssm_client.get_parameter(Name='/nyec/dev/subnetID')
 from airflow.models import Variable
 
 # iqvia_data_types = Variable.get("iqvia_data_types", deserialize_json=True)
@@ -54,11 +54,12 @@ JOB_FLOW_OVERRIDES = {
                 "InstanceRole": "CORE",
                 # "InstanceType": "r5.xlarge",
                 # "InstanceType": "c5d.18xlarge", #c5d.18xlarge	vCPU:72	RAM:144	Disk:1800 SSD
-                "InstanceType": "m5d.12xlarge",
+                # "InstanceType": "m5d.12xlarge",
+                "InstanceType": "r5d.12xlarge",
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 10
+                "InstanceCount": 6
             }
         ],
         "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
@@ -93,7 +94,7 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    return  f's3://nyce-iqvia/raw/csv/{data_set_name}/'
     # return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
@@ -183,7 +184,7 @@ TO_CURATED_SPARK_STEPS = [
                      f'spark.nyec.iqvia.raw_patient_ingest_path={generate_date_path("patient")}',
 
                     '--conf',
-                     f'spark.nyec.iqvia.raw_claim_ingest_path={generate_date_path("factdx")}',
+                     f'spark.nyec.iqvia.raw_claim_ingest_path={generate_date_path("factdx_2")}',
 
                      '--conf',
                      f'spark.nyec.iqvia.raw_procedure_ingest_path={generate_date_path("procedure")}',
@@ -209,27 +210,23 @@ TO_CURATED_SPARK_STEPS = [
                      '--conf',
                      f'spark.nyec.iqvia.file_format=csv',
 
-                     '--conf',
-                     f'spark.executor.memory=48g',
-
-                     '--conf',
-                     f'spark.executor.cores=15',
-
-                     '--conf',
-                     f'spark.sql.shuffle.partitions=3000',
-
-                     '--conf',
-                     f'spark.driver.memory=16G',
-
-                     '--conf',
-                     f'spark.driver.cores=4',
-
-                     '--conf',
-                     f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -XX:OnOutOfMemoryError=\'kill -9 %p\'',
-                     # f'spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UnlockDiagnosticVMOptions -XX:+G1SummarizeConcMark -XX:InitiatingHeapOccupancyPercent=35 -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:OnOutOfMemoryError=\'kill -9 %p\'',
+                     # '--conf',
+                     # 'spark.dynamicAllocation.enabled=false',
+                     #
+                     # '--conf',
+                     # f'num-executors=6',
 
                      # '--conf',
-                     # f'num-executors=12',
+                     # f'spark.executor.memory=280g',
+
+                     # '--conf',
+                     # f'spark.executor.cores=43',
+                     #
+                     # '--conf',
+                     # f'spark.yarn.heterogeneousExecutors.enabled=false',
+                     #
+                     # '--conf',
+                     # f'spark.sql.shuffle.partitions=816',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
@@ -296,10 +293,10 @@ trigger_curated_emr_job = EmrAddStepsOperator(
     dag=mannys_emr_iqvia_ingest_flow
 )
 
-cluster_remover = EmrTerminateJobFlowOperator(
-    task_id='remove_cluster',
-    job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
-)
+# cluster_remover = EmrTerminateJobFlowOperator(
+#     task_id='remove_cluster',
+#     job_flow_id="{{ task_instance.xcom_pull('create_emr_cluster', key='return_value') }}",
+# )
 
 # step_checker = EmrStepSensor(
 #     task_id='watch_step',

@@ -54,11 +54,11 @@ JOB_FLOW_OVERRIDES = {
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 1
+                "InstanceCount": 2
             }
         ],
-        "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
-        # "Ec2SubnetId": subnetID['Parameter']['Value'],
+        # "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
+        "Ec2SubnetId": subnetID['Parameter']['Value'],
         "TerminationProtected": False,
         "KeepJobFlowAliveWhenNoSteps": False
     },
@@ -89,7 +89,7 @@ def generate_date_path(data_set_name):
     curr_year = curr_dt.year
     curr_month = curr_dt.month
     curr_day = curr_dt.day
-    return  f's3://nyec-dev-raw-data-bucket/iqvia/{data_set_name}/20220809'
+    return  f's3://nyce-iqvia/raw/2022/8/19/{data_set_name}/'
     # return  f's3://nyce-iqvia/processed-parquet/{data_set_name}/'
     # return  f'{prefix}/{curr_year}/{curr_month}/{curr_day}/{data_set_name}'
 
