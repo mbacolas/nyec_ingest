@@ -440,9 +440,10 @@ raw_claim_df.withColumn("CLAIM_TYP_CD_NEW",test_func("CLAIM_TYP_CD")).show()
 import pyspark.sql.functions as F
 
 proc_df = \
-raw_claim_df.select(col('CLAIM_ID'),
+raw_claim_df.select(col('PATIENT_ID_CLAIM'),
+                    col('source_org_oid'),
+                    col('CLAIM_ID'),
                      col('SVC_NBR'),
-                     col('CLAIM_TYP_CD'),
                      col('SVC_FR_DT'),
                      col('SVC_TO_DT'),
                      col('PRC_CD'),
@@ -450,10 +451,32 @@ raw_claim_df.select(col('CLAIM_ID'),
                      col('CLAIM_HOSP_REV_CD'),
                      col('PRC1_MODR_CD'),
                      col('PRC3_MODR_CD'),
-                     col('PRC4_MODR_CD'))\
-                    .withColumn('code', working_fun(proc_cache_broadcast)(col('PRC_CD'), col('PRC_VERS_TYP_ID'))  ).show()
+                     col('PRC4_MODR_CD')) \
+                    .withColumnRenamed('PATIENT_ID_CLAIM', 'source_consumer_id')\
+                    .withColumnRenamed('CLAIM_ID', 'claim_id')\
+                    .withColumnRenamed('SVC_NBR', 'svc_nbr')\
+                    .withColumnRenamed('PRC_CD', 'code_raw')\
+                    .withColumnRenamed('PRC_VERS_TYP_ID', 'code_system_raw')\
+                    .withColumnRenamed('SVC_FR_DT', 'start_date_raw')\
+                    .withColumnRenamed('SVC_TO_DT', 'to_date_raw')\
+                    .withColumnRenamed('CLAIM_HOSP_REV_CD', 'revenue_code_raw')\
+
+                    .withColumn('id', lit(uuid.uuid4().hex[:12])) \
+                    .withColumn('body_site', lit(None)) \
+                    .withColumn('outcome', lit(None)) \
+                    .withColumn('complication', lit(None)) \
+                    .withColumn('note', lit(None)) \
+                    .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT'))\
+                    .withColumn('to_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT'))\
+                    .withColumn('mod_raw', )\
+
+                    .withColumn('code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+                    .withColumn('code_system', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+                    .withColumn('revenue_code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+                    .withColumn('desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+                    .withColumn('source_desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
                     # .withColumn('code', check_code( proc_cache.get(col('PRC_CD')+':'+col('PRC_VERS_TYP_ID')) ) ).show()
-.withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
+
                     # .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
 
                         .withColumn('code', check_code(col('PRC_CD'), col('PRC_VERS_TYP_ID'))) \
