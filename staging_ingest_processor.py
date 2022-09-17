@@ -389,6 +389,7 @@ print('------------------------>>>>>>> saved procs')
 #     .withColumn("PATIENT_ID_RAW", when(patient_raw.PATIENT_ID == "10","ICD10").otherwise('MANNY'))\
 #     .withColumnRenamed('PATIENT_ID_RAW', 'sour_pat_id')
 #
+
 @udf(returnType=StringType())
 def to_dob(year: int) -> date:
     dob = str(year)+'-01-01'
@@ -416,17 +417,26 @@ def to_date(str_date, col_name):
 
 # str_to_date('20200410', 'sdfsdf').value
 
-def working_fun(mapping_broadcasted):
-    def f(x, y):
-        if x is None:
-            x = ''
-
-        if y is None:
-            y = ''
-        print(x)
-        print(y)
-        k = x+':'+y
+def get_procedure_code(mapping_broadcasted):
+    def f(code, code_system_version):
+        if code is None:
+            code = ''
+        if code_system_version is None:
+            code_system_version = ''
+        k = code+':'+code_system_version
         return mapping_broadcasted.value.get(k, {}).get('PRC_CD', None)
+    return udf(f)
+
+def get_proc_code_system(mapping_broadcasted):
+    def f(code, code_system_version):
+        if code is None:
+            code = ''
+        if code_system_version is None:
+            code_system_version = ''
+        k = code + ':' + code_system_version
+        proc_type = mapping_broadcasted.value.get(k, {}).get('PRC_TYP_CD', None)
+        code_system_result = to_standard_code_system(code_system_version, proc_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD')
+        return code_system_result.value
     return udf(f)
 
 proc_cache_broadcast = spark.sparkContext.broadcast(proc_cache)
@@ -460,18 +470,16 @@ raw_claim_df.select(col('PATIENT_ID_CLAIM'),
                     .withColumnRenamed('SVC_FR_DT', 'start_date_raw')\
                     .withColumnRenamed('SVC_TO_DT', 'to_date_raw')\
                     .withColumnRenamed('CLAIM_HOSP_REV_CD', 'revenue_code_raw')\
-
                     .withColumn('id', lit(uuid.uuid4().hex[:12])) \
                     .withColumn('body_site', lit(None)) \
                     .withColumn('outcome', lit(None)) \
                     .withColumn('complication', lit(None)) \
                     .withColumn('note', lit(None)) \
-                    .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT'))\
-                    .withColumn('to_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT'))\
-                    .withColumn('mod_raw', )\
-
-                    .withColumn('code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('code_system', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+                    .withColumn('start_date', to_date(col('start_date_raw'), 'start_date_raw')) \
+                    .withColumn('to_date', to_date(col('to_date_raw'), 'to_date_raw')) \
+                    .withColumn('mod_raw', lit(''))\
+                    .withColumn('code', get_procedure_code(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))) \
+                    .withColumn('code_system', get_proc_code_system(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
                     .withColumn('revenue_code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
                     .withColumn('desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
                     .withColumn('source_desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
@@ -483,7 +491,7 @@ raw_claim_df.select(col('PATIENT_ID_CLAIM'),
                         .withColumn('code_system', get_code_system(col('PRC_CD'), col('PRC_VERS_TYP_ID')))\
                         .withColumn('error', test_row(col('SVC_FR_DT'), col('SVC_TO_DT'), col('PRC_CD'), col('PRC_VERS_TYP_ID')))
 
-proc_df.withColumn()
+
 test.withColumn("CLAIM_TYP_CD",udf_star_desc(col("CLAIM_TYP_CD")))  #.select(col('CLAIM_ID'), col('SVC_NBR'), col('CLAIM_TYP_CD'), col('SVC_FR_DT'), col('SVC_TO_DT')).first()
 test.withColumn("CLAIM_TYP_CD",func1("CLAIM_TYP_CD"))
 # # claims_raw.withColumn(col('CLAIM_ID'), lambda x: 'ABC')
