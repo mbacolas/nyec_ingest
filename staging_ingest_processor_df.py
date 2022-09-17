@@ -192,6 +192,8 @@ def get_proc_code_system(mapping_broadcasted):
     return udf(f)
 
 
+def get_proc_mods(*args):
+    return [i for i in args if i is not None]
 
 proc_df = \
 raw_claim_df.select(col('PATIENT_ID_CLAIM'),
@@ -204,6 +206,7 @@ raw_claim_df.select(col('PATIENT_ID_CLAIM'),
                      col('PRC_VERS_TYP_ID'),
                      col('CLAIM_HOSP_REV_CD'),
                      col('PRC1_MODR_CD'),
+                     col('PRC2_MODR_CD'),
                      col('PRC3_MODR_CD'),
                      col('PRC4_MODR_CD')) \
                     .withColumnRenamed('PATIENT_ID_CLAIM', 'source_consumer_id')\
@@ -221,7 +224,8 @@ raw_claim_df.select(col('PATIENT_ID_CLAIM'),
                     .withColumn('note', lit(None)) \
                     .withColumn('start_date', to_date(col('start_date_raw'), 'start_date_raw')) \
                     .withColumn('to_date', to_date(col('to_date_raw'), 'to_date_raw')) \
-                    .withColumn('mod_raw', lit(''))\
+                    .withColumn('mod_raw', array(get_proc_mods(col('PRC1_MODR_CD'), col('PRC2_MODR_CD'), col('PRC3_MODR_CD'), col('PRC4_MODR_CD'))))\
+                    .withColumn('date_created', lit(date_created))\
                     .withColumn('code', get_procedure_code(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))) \
                     .withColumn('code_system', get_proc_code_system(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
                     .withColumn('revenue_code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
