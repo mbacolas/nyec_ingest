@@ -106,7 +106,9 @@ raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_form
 
 # .withColumn('SALT', (10*rand()).cast(IntegerType()))\
 # .limit(10 * 1000 * 1000)\
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format).limit(100)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format) \
+        .withColumn('batch_id', lit(batch_id)) \
+        .withColumn('date_created', lit(date_created))
     # .persist(StorageLevel.MEMORY_AND_DISK)
 
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
@@ -165,51 +167,51 @@ ref_cache = {PROCEDURE: proc_cache, PROBLEM: problem_cache, DRUG: drug_cache, PR
 print('------------------------>>>>>>> broadcasting reference data')
 broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 
-@udf(returnType=MapType(StringType(), StringType()))
+# @udf(returnType=MapType(StringType(), StringType()))
 def ref_lookup(event_type: str, key: str):
     return broadcast_cache.value[event_type].get(key, {})
 
 
 
 ### create stage patient DF
-patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
-    .withColumn('source_org_oid', lit('IQVIA')) \
-    .withColumn('date_created', lit(date_created)) \
-    .rdd\
-    .persist(StorageLevel.MEMORY_AND_DISK)
+# patient_rdd = raw_patient_df.withColumn('batch_id', lit(batch_id)) \
+#     .withColumn('source_org_oid', lit('IQVIA')) \
+#     .withColumn('date_created', lit(date_created)) \
+#     .rdd\
+#     .persist(StorageLevel.MEMORY_AND_DISK)
 
-currated_patient_df = to_patient(patient_rdd).persist(StorageLevel.MEMORY_AND_DISK)
+# currated_patient_df = to_patient(patient_rdd).persist(StorageLevel.MEMORY_AND_DISK)
 
 # currated_patient_df = currated_patient_rdd.toDF(stage_patient_schema).persist(StorageLevel.MEMORY_AND_DISK)
-save_patient(currated_patient_df, generate_output_path('patient'))
-save_errors(currated_patient_df, PATIENT, generate_output_path('error'))
+# save_patient(currated_patient_df, generate_output_path('patient'))
+# save_errors(currated_patient_df, PATIENT, generate_output_path('error'))
 
-patient_rdd.unpersist()
-currated_patient_df.unpersist()
+# patient_rdd.unpersist()
+# currated_patient_df.unpersist()
 
 print('------------------------>>>>>>> saved patient <<<--- ')
 
 # raw_claim_df.CLAIM_SALT == raw_patient_df.PATIENT_SALT
 ### create clinical events
-patient_claims_raw_rdd = raw_patient_df \
-    .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
-    .withColumn('batch_id', lit(batch_id)) \
-    .withColumn('date_created', lit(date_created)) \
-    .rdd\
-    .persist(StorageLevel.MEMORY_AND_DISK)
+# patient_claims_raw_rdd = raw_patient_df \
+#     .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
+#     .withColumn('batch_id', lit(batch_id)) \
+#     .withColumn('date_created', lit(date_created)) \
+#     .rdd\
+#     .persist(StorageLevel.MEMORY_AND_DISK)
 
 print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
 ### create procedure
-procedure_df = to_procedure(patient_claims_raw_rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
-save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
-save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
+procedure_df = to_procedure(raw_claim_df.rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
+# save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
+# save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
 # currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_procedure(procedure_df, generate_output_path('procedure'))
-procedure_df.unpersist(False)
+# procedure_df.unpersist(False)
 # procedure_rdd.unpersist(False)
-raw_patient_df.unpersist()
-raw_claim_df.unpersist()
+# raw_patient_df.unpersist()
+# raw_claim_df.unpersist()
 
 print('------------------------>>>>>>> saved procs')
 # #
@@ -389,111 +391,111 @@ print('------------------------>>>>>>> saved procs')
 #     .withColumn("PATIENT_ID_RAW", when(patient_raw.PATIENT_ID == "10","ICD10").otherwise('MANNY'))\
 #     .withColumnRenamed('PATIENT_ID_RAW', 'sour_pat_id')
 #
-
-@udf(returnType=StringType())
-def to_dob(year: int) -> date:
-    dob = str(year)+'-01-01'
-    return datetime.strptime(dob, "%Y-%m-%d").date()
-
-udf_star_desc = udf(lambda year:to_dob(year),DateType())
-
-@udf(returnType=ArrayType(StringType()))
-def test_row(from_date, to_date, code, code_system_version):
-    return ['error1', 'error2']
-
+#
 # @udf(returnType=StringType())
-# # def check_code(code, code_system_version, ref_func):
-# def check_code(result):
-#     print(result)
-#     return result.get('PRC_CD', 'None')
-
-@udf(returnType=StringType())
-def get_code_system(code, code_system_version):
-    return code
-
-@udf(returnType=DateType())
-def to_date(str_date, col_name):
-    return str_to_date(str_date, col_name).value
-
-# str_to_date('20200410', 'sdfsdf').value
-
-def get_procedure_code(mapping_broadcasted):
-    def f(code, code_system_version):
-        if code is None:
-            code = ''
-        if code_system_version is None:
-            code_system_version = ''
-        k = code+':'+code_system_version
-        return mapping_broadcasted.value.get(k, {}).get('PRC_CD', None)
-    return udf(f)
-
-def get_proc_code_system(mapping_broadcasted):
-    def f(code, code_system_version):
-        if code is None:
-            code = ''
-        if code_system_version is None:
-            code_system_version = ''
-        k = code + ':' + code_system_version
-        proc_type = mapping_broadcasted.value.get(k, {}).get('PRC_TYP_CD', None)
-        code_system_result = to_standard_code_system(code_system_version, proc_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD')
-        return code_system_result.value
-    return udf(f)
-
-proc_cache_broadcast = spark.sparkContext.broadcast(proc_cache)
-
-udf_test_row = udf(lambda from_date, to_date, code, code_system_version:test_row(from_date, to_date, code, code_system_version),ArrayType(StringType()))
-udf_check_code = udf(lambda code, code_system:check_code(code, code_system, ref_lookup),StringType())
-udf_code_system_code = udf(lambda code, code_system:get_code_system(code, code_system),StringType())
-udf_test = udf(lambda code:test_func(code),StringType())
-raw_claim_df.withColumn("CLAIM_TYP_CD_NEW",test_func("CLAIM_TYP_CD")).show()
-
-import pyspark.sql.functions as F
-
-proc_df = \
-raw_claim_df.select(col('PATIENT_ID_CLAIM'),
-                    col('source_org_oid'),
-                    col('CLAIM_ID'),
-                     col('SVC_NBR'),
-                     col('SVC_FR_DT'),
-                     col('SVC_TO_DT'),
-                     col('PRC_CD'),
-                     col('PRC_VERS_TYP_ID'),
-                     col('CLAIM_HOSP_REV_CD'),
-                     col('PRC1_MODR_CD'),
-                     col('PRC3_MODR_CD'),
-                     col('PRC4_MODR_CD')) \
-                    .withColumnRenamed('PATIENT_ID_CLAIM', 'source_consumer_id')\
-                    .withColumnRenamed('CLAIM_ID', 'claim_id')\
-                    .withColumnRenamed('SVC_NBR', 'svc_nbr')\
-                    .withColumnRenamed('PRC_CD', 'code_raw')\
-                    .withColumnRenamed('PRC_VERS_TYP_ID', 'code_system_raw')\
-                    .withColumnRenamed('SVC_FR_DT', 'start_date_raw')\
-                    .withColumnRenamed('SVC_TO_DT', 'to_date_raw')\
-                    .withColumnRenamed('CLAIM_HOSP_REV_CD', 'revenue_code_raw')\
-                    .withColumn('id', lit(uuid.uuid4().hex[:12])) \
-                    .withColumn('body_site', lit(None)) \
-                    .withColumn('outcome', lit(None)) \
-                    .withColumn('complication', lit(None)) \
-                    .withColumn('note', lit(None)) \
-                    .withColumn('start_date', to_date(col('start_date_raw'), 'start_date_raw')) \
-                    .withColumn('to_date', to_date(col('to_date_raw'), 'to_date_raw')) \
-                    .withColumn('mod_raw', lit(''))\
-                    .withColumn('code', get_procedure_code(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))) \
-                    .withColumn('code_system', get_proc_code_system(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('revenue_code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('source_desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    # .withColumn('code', check_code( proc_cache.get(col('PRC_CD')+':'+col('PRC_VERS_TYP_ID')) ) ).show()
-
-                    # .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
-
-                        .withColumn('code', check_code(col('PRC_CD'), col('PRC_VERS_TYP_ID'))) \
-                        .withColumn('code_system', get_code_system(col('PRC_CD'), col('PRC_VERS_TYP_ID')))\
-                        .withColumn('error', test_row(col('SVC_FR_DT'), col('SVC_TO_DT'), col('PRC_CD'), col('PRC_VERS_TYP_ID')))
-
-
-test.withColumn("CLAIM_TYP_CD",udf_star_desc(col("CLAIM_TYP_CD")))  #.select(col('CLAIM_ID'), col('SVC_NBR'), col('CLAIM_TYP_CD'), col('SVC_FR_DT'), col('SVC_TO_DT')).first()
-test.withColumn("CLAIM_TYP_CD",func1("CLAIM_TYP_CD"))
+# def to_dob(year: int) -> date:
+#     dob = str(year)+'-01-01'
+#     return datetime.strptime(dob, "%Y-%m-%d").date()
+#
+# udf_star_desc = udf(lambda year:to_dob(year),DateType())
+#
+# @udf(returnType=ArrayType(StringType()))
+# def test_row(from_date, to_date, code, code_system_version):
+#     return ['error1', 'error2']
+#
+# # @udf(returnType=StringType())
+# # # def check_code(code, code_system_version, ref_func):
+# # def check_code(result):
+# #     print(result)
+# #     return result.get('PRC_CD', 'None')
+#
+# @udf(returnType=StringType())
+# def get_code_system(code, code_system_version):
+#     return code
+#
+# @udf(returnType=DateType())
+# def to_date(str_date, col_name):
+#     return str_to_date(str_date, col_name).value
+#
+# # str_to_date('20200410', 'sdfsdf').value
+#
+# def get_procedure_code(mapping_broadcasted):
+#     def f(code, code_system_version):
+#         if code is None:
+#             code = ''
+#         if code_system_version is None:
+#             code_system_version = ''
+#         k = code+':'+code_system_version
+#         return mapping_broadcasted.value.get(k, {}).get('PRC_CD', None)
+#     return udf(f)
+#
+# def get_proc_code_system(mapping_broadcasted):
+#     def f(code, code_system_version):
+#         if code is None:
+#             code = ''
+#         if code_system_version is None:
+#             code_system_version = ''
+#         k = code + ':' + code_system_version
+#         proc_type = mapping_broadcasted.value.get(k, {}).get('PRC_TYP_CD', None)
+#         code_system_result = to_standard_code_system(code_system_version, proc_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD')
+#         return code_system_result.value
+#     return udf(f)
+#
+# proc_cache_broadcast = spark.sparkContext.broadcast(proc_cache)
+#
+# udf_test_row = udf(lambda from_date, to_date, code, code_system_version:test_row(from_date, to_date, code, code_system_version),ArrayType(StringType()))
+# udf_check_code = udf(lambda code, code_system:check_code(code, code_system, ref_lookup),StringType())
+# udf_code_system_code = udf(lambda code, code_system:get_code_system(code, code_system),StringType())
+# udf_test = udf(lambda code:test_func(code),StringType())
+# raw_claim_df.withColumn("CLAIM_TYP_CD_NEW",test_func("CLAIM_TYP_CD")).show()
+#
+# import pyspark.sql.functions as F
+#
+# proc_df = \
+# raw_claim_df.select(col('PATIENT_ID_CLAIM'),
+#                     col('source_org_oid'),
+#                     col('CLAIM_ID'),
+#                      col('SVC_NBR'),
+#                      col('SVC_FR_DT'),
+#                      col('SVC_TO_DT'),
+#                      col('PRC_CD'),
+#                      col('PRC_VERS_TYP_ID'),
+#                      col('CLAIM_HOSP_REV_CD'),
+#                      col('PRC1_MODR_CD'),
+#                      col('PRC3_MODR_CD'),
+#                      col('PRC4_MODR_CD')) \
+#                     .withColumnRenamed('PATIENT_ID_CLAIM', 'source_consumer_id')\
+#                     .withColumnRenamed('CLAIM_ID', 'claim_id')\
+#                     .withColumnRenamed('SVC_NBR', 'svc_nbr')\
+#                     .withColumnRenamed('PRC_CD', 'code_raw')\
+#                     .withColumnRenamed('PRC_VERS_TYP_ID', 'code_system_raw')\
+#                     .withColumnRenamed('SVC_FR_DT', 'start_date_raw')\
+#                     .withColumnRenamed('SVC_TO_DT', 'to_date_raw')\
+#                     .withColumnRenamed('CLAIM_HOSP_REV_CD', 'revenue_code_raw')\
+#                     .withColumn('id', lit(uuid.uuid4().hex[:12])) \
+#                     .withColumn('body_site', lit(None)) \
+#                     .withColumn('outcome', lit(None)) \
+#                     .withColumn('complication', lit(None)) \
+#                     .withColumn('note', lit(None)) \
+#                     .withColumn('start_date', to_date(col('start_date_raw'), 'start_date_raw')) \
+#                     .withColumn('to_date', to_date(col('to_date_raw'), 'to_date_raw')) \
+#                     .withColumn('mod_raw', lit(''))\
+#                     .withColumn('code', get_procedure_code(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))) \
+#                     .withColumn('code_system', get_proc_code_system(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+#                     .withColumn('revenue_code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+#                     .withColumn('desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+#                     .withColumn('source_desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
+#                     # .withColumn('code', check_code( proc_cache.get(col('PRC_CD')+':'+col('PRC_VERS_TYP_ID')) ) ).show()
+#
+#                     # .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
+#
+#                         .withColumn('code', check_code(col('PRC_CD'), col('PRC_VERS_TYP_ID'))) \
+#                         .withColumn('code_system', get_code_system(col('PRC_CD'), col('PRC_VERS_TYP_ID')))\
+#                         .withColumn('error', test_row(col('SVC_FR_DT'), col('SVC_TO_DT'), col('PRC_CD'), col('PRC_VERS_TYP_ID')))
+#
+#
+# test.withColumn("CLAIM_TYP_CD",udf_star_desc(col("CLAIM_TYP_CD")))  #.select(col('CLAIM_ID'), col('SVC_NBR'), col('CLAIM_TYP_CD'), col('SVC_FR_DT'), col('SVC_TO_DT')).first()
+# test.withColumn("CLAIM_TYP_CD",func1("CLAIM_TYP_CD"))
 # # claims_raw.withColumn(col('CLAIM_ID'), lambda x: 'ABC')
 # #
 #

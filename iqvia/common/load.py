@@ -37,9 +37,9 @@ def load_patient(spark: SparkSession, load_path: str, schema: StructType, format
 def load_claim(spark: SparkSession, load_path: str, schema: StructType, format_type):
     return load_df(spark, load_path, schema, format_type=format_type) \
         .withColumn("PLAN_ID_CLAIM", col("PLAN_ID")) \
-        .withColumn("PATIENT_ID_CLAIM", col("PATIENT_ID")) \
-        .withColumn('source_org_oid', lit('IQVIA')) \
-        .drop(col("PATIENT_ID"))
+        .withColumn('source_org_oid', lit('IQVIA'))
+        # .drop(col("PATIENT_ID"))
+# .withColumn("PATIENT_ID_CLAIM", col("PATIENT_ID")) \
 
 
 def load_procedure(spark: SparkSession, load_path: str, schema: StructType, format_type):

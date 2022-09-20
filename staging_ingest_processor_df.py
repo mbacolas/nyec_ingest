@@ -86,7 +86,10 @@ raw_patient_df = load_patient(spark, patient_path, raw_patient_schema, file_form
 
 # .withColumn('SALT', (10*rand()).cast(IntegerType()))\
 # .limit(10 * 1000 * 1000)\
-raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format).limit(100)
+raw_claim_df = load_claim(spark, claim_path, raw_claim_schema, file_format)\
+                    .withColumn('batch_id', lit(batch_id))\
+                    .withColumn('date_created', lit(date_created))
+
     # .persist(StorageLevel.MEMORY_AND_DISK)
 
 raw_proc_df = load_procedure(spark, procedure_path, raw_procedure_schema, file_format)
@@ -146,37 +149,78 @@ print('------------------------>>>>>>> broadcasting reference data')
 # broadcast_cache = spark.sparkContext.broadcast(ref_cache)
 proc_cache_broadcast = spark.sparkContext.broadcast(proc_cache)
 
-@udf(returnType=MapType(StringType(), StringType()))
-def ref_lookup(event_type: str, key: str):
-    return broadcast_cache.value[event_type].get(key, {})
+# @udf(returnType=MapType(StringType(), StringType()))
+# def ref_lookup(event_type: str, key: str):
+#     return broadcast_cache.value[event_type].get(key, {})
 
-patient_claims_raw_rdd = raw_patient_df \
-    .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
-    .withColumn('batch_id', lit(batch_id)) \
-    .withColumn('date_created', lit(date_created)) \
-    .rdd\
-    .persist(StorageLevel.MEMORY_AND_DISK)
+# patient_claims_raw_rdd = raw_patient_df \
+#     .join(raw_claim_df, on=[raw_claim_df.PATIENT_ID_CLAIM == raw_patient_df.PATIENT_ID,], how="inner") \
+#     .withColumn('batch_id', lit(batch_id)) \
+#     .withColumn('date_created', lit(date_created)) \
+#     .rdd\
+#     .persist(StorageLevel.MEMORY_AND_DISK)
 
-
-@udf(returnType=StringType())
-def get_code_system(code, code_system_version):
-    to_standard_code_system(code_system_version, )
-    return code
 
 @udf(returnType=DateType())
-def to_date(str_date, col_name):
-    return str_to_date(str_date, col_name).value
+def to_date(str_date, col_name, required=True):
+    return str_to_date(str_date, col_name, is_required=required).value
 
 # str_to_date('20200410', 'sdfsdf').value
+
+
+# def get_local_code(code, code_system_version, mapping_broadcasted):
+#     if code is None:
+#         return None
+#     if code_system_version is None:
+#         return None
+#     k = code + ':' + code_system_version
+#     proc_type = mapping_broadcasted.value.get(k, {}).get('PRC_TYP_CD', None)
+#     code_system = to_standard_code_system(code_system_version, proc_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
+#     proc_code_result = find_code(code, code_system, 'PRC_CD')
+#     return extract_code(proc_code_result).get('code', None)
 
 def get_procedure_code(mapping_broadcasted):
     def f(code, code_system_version):
         if code is None:
-            code = ''
+            return None
         if code_system_version is None:
-            code_system_version = ''
-        k = code+':'+code_system_version
-        return mapping_broadcasted.value.get(k, {}).get('PRC_CD', None)
+            return None
+        k = code + ':' + code_system_version
+        proc_type = mapping_broadcasted.value.get(k, {}).get('PRC_TYP_CD', None)
+        code_system = to_standard_code_system(code_system_version, proc_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
+        proc_code_result = find_code(code, code_system, 'PRC_CD')
+        return extract_code(proc_code_result).get('code', None)
+    return udf(f)
+
+def get_procedure_desc(mapping_broadcasted):
+    def f(code, code_system_version):
+        if code is None:
+            return None
+        if code_system_version is None:
+            return None
+        k = code + ':' + code_system_version
+        proc_type = mapping_broadcasted.value.get(k, {}).get('PRC_TYP_CD', None)
+        code_system = to_standard_code_system(code_system_version, proc_type, 'PRC_VERS_TYP_ID:PRC_TYP_CD').value
+        proc_code_result = find_code(code, code_system, 'PRC_CD')
+        return extract_code(proc_code_result).get('desc', None)
+    return udf(f)
+
+def get_source_procedure_desc(mapping_broadcasted):
+    def f(code, code_system_version):
+        if code is None:
+            return None
+        if code_system_version is None:
+            return None
+        cach_key = code+':'+code_system_version
+        return mapping_broadcasted.value.get(cach_key, {}).get('PRC_SHORT_DESC', None)
+    return udf(f)
+
+def get_rev_code(mapping_broadcasted):
+    def f(code):
+        if code is None:
+            return None
+        proc_code_result =  find_code(code, 'REV', 'REV')
+        return extract_code(proc_code_result).get('code', None)
     return udf(f)
 
 def get_proc_code_system(mapping_broadcasted):
@@ -191,12 +235,47 @@ def get_proc_code_system(mapping_broadcasted):
         return code_system_result.value
     return udf(f)
 
-
 def get_proc_mods(*args):
     return [i for i in args if i is not None]
 
+@udf(returnType=StringType())
+def validate_row(code,
+                 code_system,
+                 code_raw,
+                 code_system_raw,
+                 rev_code,
+                 rev_code_raw,
+                 from_date_raw,
+                 to_date_raw,
+                 row_id) -> str:
+    import json
+    from_result = to_date(from_date_raw, 'from_date_raw')
+    to_result = to_date(to_date_raw, 'to_date_raw', False)
+
+    proc_code_result = find_code(code_raw, code_system_raw, 'PRC_CD')
+
+
+    validation_errors = extract_left(*[from_result,
+                                       to_result,
+                                       proc_code_result])
+    errors = []
+    if code is None or code_system is None:
+        errors.append({'error': f'CODE_SYSTEM:CODE {code}:{code_system} NOT FOUND or is INVALID', 'id': row_id})
+    return json.dumps(errors)
+
+# def get_proc_mods_2(mod1, mod2):
+#     arr = [mod1, mod2]
+#     return [i for i in arr if i is not None]
+#
+# arr=['1', '2', None, '4']
+# x = [i for i in arr if i is not None]
+# a = raw_claim_df.filter(col("PRC_CD").isNotNull())\
+#     .select(col('PRC1_MODR_CD'), col('PRC2_MODR_CD'), col('PRC3_MODR_CD'), col('PRC4_MODR_CD'))\
+#     .withColumn('mod_raw', array(get_proc_mods_2(col('PRC1_MODR_CD'), col('PRC2_MODR_CD'))))
+# a.first()
 proc_df = \
-raw_claim_df.select(col('PATIENT_ID_CLAIM'),
+raw_claim_df.filter(col("PRC_CD").isNotNull())\
+            .select(col('PATIENT_ID_CLAIM'),
                     col('source_org_oid'),
                     col('CLAIM_ID'),
                      col('SVC_NBR'),
@@ -208,8 +287,10 @@ raw_claim_df.select(col('PATIENT_ID_CLAIM'),
                      col('PRC1_MODR_CD'),
                      col('PRC2_MODR_CD'),
                      col('PRC3_MODR_CD'),
-                     col('PRC4_MODR_CD')) \
-                    .withColumnRenamed('PATIENT_ID_CLAIM', 'source_consumer_id')\
+                     col('PRC4_MODR_CD'), \
+                     col('batch_id'), \
+                     col('date_created')) \
+                    .withColumnRenamed('PATIENT_ID', 'source_consumer_id')\
                     .withColumnRenamed('CLAIM_ID', 'claim_id')\
                     .withColumnRenamed('SVC_NBR', 'svc_nbr')\
                     .withColumnRenamed('PRC_CD', 'code_raw')\
@@ -218,17 +299,35 @@ raw_claim_df.select(col('PATIENT_ID_CLAIM'),
                     .withColumnRenamed('SVC_TO_DT', 'to_date_raw')\
                     .withColumnRenamed('CLAIM_HOSP_REV_CD', 'revenue_code_raw')\
                     .withColumn('id', lit(uuid.uuid4().hex[:12])) \
-                    .withColumn('body_site', lit(None)) \
-                    .withColumn('outcome', lit(None)) \
-                    .withColumn('complication', lit(None)) \
-                    .withColumn('note', lit(None)) \
-                    .withColumn('start_date', to_date(col('start_date_raw'), 'start_date_raw')) \
-                    .withColumn('to_date', to_date(col('to_date_raw'), 'to_date_raw')) \
+                    .withColumn('body_site', lit(None).cast("string")) \
+                    .withColumn('outcome', lit(None).cast("string")) \
+                    .withColumn('complication', lit(None).cast("string")) \
+                    .withColumn('note', lit(None).cast("string")) \
+                    .withColumn('start_date', lit(to_date(col('start_date_raw'), 'start_date_raw'))) \
+                    .withColumn('to_date', lit(to_date(col('to_date_raw'), 'to_date_raw'))) \
                     .withColumn('mod_raw', array(get_proc_mods(col('PRC1_MODR_CD'), col('PRC2_MODR_CD'), col('PRC3_MODR_CD'), col('PRC4_MODR_CD'))))\
-                    .withColumn('date_created', lit(date_created))\
+                    .withColumn('mod', array(get_proc_mods(col('PRC1_MODR_CD'), col('PRC2_MODR_CD'), col('PRC3_MODR_CD'), col('PRC4_MODR_CD'))))\
+                    .withColumn('date_created', lit(date_created)) \
                     .withColumn('code', get_procedure_code(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))) \
-                    .withColumn('code_system', get_proc_code_system(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('revenue_code', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    .withColumn('source_desc', working_fun(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ).show()
-                    # .withColumn('code', check_code( proc_cache.get(col('PRC_CD')+':'+col('PRC_VERS_TYP_ID')) ) ).show()
+                    .withColumn('code_system', get_proc_code_system(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ) \
+                    .withColumn('revenue_code', get_rev_code(proc_cache_broadcast)(col('revenue_code_raw'))  ) \
+                    .withColumn('source_desc', get_source_procedure_desc(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ) \
+                    .withColumn('desc', get_procedure_desc(proc_cache_broadcast)(col('code_raw'), col('code_system_raw')) )\
+                    .withColumn('is_valid', lit(True)) \
+                    .withColumn('errors', validate_row(col('code'),
+                                                       col('code_system'),
+                                                       col('code_raw'),
+                                                       col('code_system_raw'),
+                                                       col('rev_code'),
+                                                       col('rev_code_raw'),
+                                                       col('from_date_raw'),
+                                                       col('to_date_raw'),
+                                                       col('id'))) \
+                    .withColumn('is_valid_2', col('is_valid')).show() \
+
+                    .dropDuplicates(['source_consumer_id',
+                                     'start_date_raw',
+                                     'code_raw',
+                                     'code_system_raw'])
+
+save_procedure(proc_df, generate_output_path('procedure'))

@@ -138,10 +138,12 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
                 col('source_desc'),
                 col('batch_id'),
                 col('date_created')) \
-        .repartition(col('source_consumer_id'))\
-        .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
-        .write\
+        .write \
         .parquet(output_path, mode='overwrite', compression='snappy')
+        # .repartition(col('source_consumer_id'))\
+        # .sortWithinPartitions(col('source_consumer_id'), col('code_system'), col('code'), col('start_date'))\
+        # .write\
+        # .parquet(output_path, mode='overwrite', compression='snappy')
         # .parquet(output_path, mode='overwrite', compression='snappy')
 
 

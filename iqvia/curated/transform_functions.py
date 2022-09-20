@@ -141,8 +141,7 @@ def _to_procedure_row(claim_row: Row, ref_lookup) -> Row:
                    is_valid=valid,
                    has_warnings=warn,
                    batch_id=claim_row.batch_id,
-                   date_created=claim_row.date_created,
-                   salt=claim_row.PATIENT_SALT)
+                   date_created=claim_row.date_created)
     return proc_row
 
 
@@ -157,7 +156,7 @@ def to_procedure(claim_rdd: RDD, ref_lookup) -> DataFrame:
         .map(lambda r: _to_procedure_row(r, ref_lookup)) \
         .toDF(stage_procedure_schema) \
         .dropDuplicates(['source_consumer_id',
-                         'start_date',
+                         'start_date_raw',
                          'code_raw',
                          'code_system_raw'])
 

@@ -59,7 +59,7 @@ JOB_FLOW_OVERRIDES = {
                 # "InstanceType": "r5.4xlarge",
                 # "InstanceType": "m5.xlarge",
                 # "InstanceCount": 18
-                "InstanceCount": 6
+                "InstanceCount": 3
             }
         ],
         "Ec2SubnetId": "subnet-00031e4e4cd2b33a4",
