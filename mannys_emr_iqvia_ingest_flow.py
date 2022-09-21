@@ -231,7 +231,7 @@ TO_CURATED_SPARK_STEPS = [
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
                      
-                     '/home/hadoop/staging_ingest_processor.py'
+                     '/home/hadoop/staging_ingest_processor_df.py'
                      ]
         }
     }

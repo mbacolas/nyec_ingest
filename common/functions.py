@@ -12,6 +12,8 @@ all_codes = {}
 all_code_systems = {'ICD10'}
 NDC = 'NDC'
 
+from pyspark.sql.functions import udf
+@udf(returnType=Either())
 def str_to_date(date_raw: str, source_column_name: str, is_required=True, date_format="%Y%m%d") -> Either:
     try:
         if not is_required and date_raw is None:

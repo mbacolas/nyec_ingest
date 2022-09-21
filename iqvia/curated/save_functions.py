@@ -34,24 +34,40 @@ class DateTimeEncoder(JSONEncoder):
 #         .write\
 #         .parquet(output_path, mode='append', compression='snappy')
 
+@udf(returnType=StringType())
+def generate_id():
+    return uuid.uuid4().hex[:12]
+
 
 def save_errors(error_df: DataFrame, row_type: str, output_path: str):
-    error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
-        .rdd\
-        .map(lambda r: Row(id=uuid.uuid4().hex[:12],
-                           batch_id=r.batch_id,
-                           type=row_type,
-                           is_valid=r.is_valid,
-                           has_warnings=r.has_warnings,
-                           row_errors=json.dumps(r.error),
-                           row_warnings=json.dumps(r.warning),
-                           row_value=json.dumps(r.asDict(), indent=4, cls=DateTimeEncoder),
-                           date_created=datetime.now())) \
-        .toDF(error_schema) \
-        .write \
-        .parquet(output_path, mode='append', compression='snappy')
+    error_df.filter((col('is_valid') != True) | (col('has_warnings') == True))\
+            .select(col('batch_id'),
+                    lit(row_type),
+                    col('is_valid'),
+                    col('has_warnings'),
+                    col('errors'),
+                    col('warning'),
+                    lit(datetime.now())) \
+            .withColumn('id', generate_id())\
+            .write \
+            .parquet(output_path, mode='append', compression='snappy')
 
 
+# def save_errors(error_df: DataFrame, row_type: str, output_path: str):
+#     error_df.filter((col('is_valid') != True) | (col('has_warnings') == True)) \
+#         .rdd\
+#         .map(lambda r: Row(id=uuid.uuid4().hex[:12],
+#                            batch_id=r.batch_id,
+#                            type=row_type,
+#                            is_valid=r.is_valid,
+#                            has_warnings=r.has_warnings,
+#                            row_errors=json.dumps(r.error),
+#                            row_warnings=json.dumps(r.warning),
+#                            row_value=json.dumps(r.asDict(), indent=4, cls=DateTimeEncoder),
+#                            date_created=datetime.now())) \
+#         .toDF(error_schema) \
+#         .write \
+#         .parquet(output_path, mode='append', compression='snappy')
         # .parquet('s3://nyce-iqvia/curated/error', mode='overwrite')
     # rdd.filter(lambda r: r.is_included == False) \
     #     .map(lambda r: Row(batch_id=r.batch_id,
@@ -147,8 +163,24 @@ def save_procedure(currated_procedure_df: DataFrame, output_path: str):
         # .parquet(output_path, mode='overwrite', compression='snappy')
 
 
-def save_procedure_modifiers(currated_procedure_mods_rdd: RDD, output_path: str):
-    currated_procedure_mods_rdd.filter(lambda r: r.is_valid == False and len(r.mod) > 0)\
+def save_procedure_modifiers(proc_df: DataFrame, output_path: str):
+    proc_df.filter((col('is_valid') == True) & (size(col('mod')) > 0))\
+            .select(col('source_org_oid'),
+                    col('source_consumer_id'),
+                    col('start_date'),
+                    col('to_date'),
+                    col('code'),
+                    col('code_system'),
+                    col('batch_id'),
+                    col('date_created'),
+                    explode(col('mod'))) \
+            .withColumn('id', generate_id()) \
+            .write \
+            .parquet(output_path, mode='overwrite', compression='snappy')
+
+
+def save_procedure_modifiers_rdd(currated_procedure_mods_rdd: RDD, output_path: str):
+    currated_procedure_mods_rdd.filter(lambda r: r.is_valid == True and len(r.mod) > 0)\
                                 .flatMap(lambda r: map(lambda y: Row(id=r.id,
                                                                      source_org_oid=r.source_org_oid,
                                                                      source_consumer_id=r.source_consumer_id,

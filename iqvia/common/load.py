@@ -13,7 +13,7 @@ def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimi
             return spark.read \
                 .schema(schema) \
                 .options(inferSchema=False, delimiter=file_delimiter, header=file_header) \
-                .csv(load_path)
+                .csv(load_path).limit(1000)
         else:
             return spark.read \
                 .options(inferSchema=True, delimiter=file_delimiter, header=file_header) \
@@ -34,8 +34,8 @@ def load_patient(spark: SparkSession, load_path: str, schema: StructType, format
         .withColumn('consumer_status', lit(True))
 
 
-def load_claim(spark: SparkSession, load_path: str, schema: StructType, format_type):
-    return load_df(spark, load_path, schema, format_type=format_type) \
+def load_claim(spark: SparkSession, load_path: str, schema: StructType, file_format):
+    return load_df(spark, load_path, schema, format_type=file_format) \
         .withColumn("PLAN_ID_CLAIM", col("PLAN_ID")) \
         .withColumn('source_org_oid', lit('IQVIA'))
         # .drop(col("PATIENT_ID"))
