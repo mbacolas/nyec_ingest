@@ -45,7 +45,7 @@ def save_errors(error_df: DataFrame, row_type: str, output_path: str):
                     lit(row_type),
                     col('is_valid'),
                     col('has_warnings'),
-                    col('errors'),
+                    col('error'),
                     col('warning'),
                     lit(datetime.now())) \
             .withColumn('id', generate_id())\

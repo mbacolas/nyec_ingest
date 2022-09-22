@@ -13,7 +13,7 @@ def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimi
             return spark.read \
                 .schema(schema) \
                 .options(inferSchema=False, delimiter=file_delimiter, header=file_header) \
-                .csv(load_path).limit(1000)
+                .csv(load_path)
         else:
             return spark.read \
                 .options(inferSchema=True, delimiter=file_delimiter, header=file_header) \

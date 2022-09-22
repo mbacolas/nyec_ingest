@@ -1,14 +1,12 @@
-import json
-
 from iqvia.curated.transform_functions import *
 from iqvia.curated.save_functions import *
 from iqvia.common.load import *
 from iqvia.common.schema import *
 from pyspark.sql import SQLContext
 from pyspark import StorageLevel
-from pymonad.either import *
 import uuid
 from datetime import datetime
+from pymonad.either import *
 
 PATIENT = 'PATIENT'
 PROCEDURE = 'PROCEDURE'
@@ -368,7 +366,7 @@ raw_claim_df.filter(col("PRC_CD").isNotNull())\
                                            col('to_date'),
                                            col('to_date_raw'),
                                            col('id')))\
-                    .withColumn('is_valid', is_valid(col('errors')))\
+                    .withColumn('is_valid', is_valid(col('error')))\
                     .withColumn('warning', get_warnings())\
                     .withColumn('has_warnings', has_warnings(col('warning')))\
                     .dropDuplicates(['source_consumer_id',
