@@ -47,7 +47,7 @@ def save_errors(error_df: DataFrame, row_type: str, output_path: str):
                     col('has_warnings'),
                     col('error'),
                     col('warning'),
-                    lit(datetime.now())) \
+                    col('date_created')) \
             .withColumn('id', generate_id())\
             .write \
             .parquet(output_path, mode='append', compression='snappy')

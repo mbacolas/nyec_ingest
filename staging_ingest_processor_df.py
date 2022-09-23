@@ -354,29 +354,33 @@ raw_claim_df.filter(col("PRC_CD").isNotNull())\
                     .withColumn('revenue_code', get_rev_code(proc_cache_broadcast)(col('revenue_code_raw'))) \
                     .withColumn('source_desc', get_source_procedure_desc(proc_cache_broadcast)(col('code_raw'), col('code_system_raw'))  ) \
                     .withColumn('desc', get_procedure_desc(proc_cache_broadcast)(col('code_raw'), col('code_system_raw')) )\
-                    .withColumn('error', validate_row(
-                                           col('code'),
-                                           col('code_raw'),
-                                           col('code_system'),
-                                           col('code_system_raw'),
-                                           col('revenue_code'),
-                                           col('revenue_code_raw'),
-                                           col('start_date'),
-                                           col('start_date_raw'),
-                                           col('to_date'),
-                                           col('to_date_raw'),
-                                           col('id')))\
-                    .withColumn('is_valid', is_valid(col('error')))\
-                    .withColumn('warning', get_warnings())\
-                    .withColumn('has_warnings', has_warnings(col('warning')))\
+                    .withColumn('is_valid', lit(True))\
                     .dropDuplicates(['source_consumer_id',
                                      'start_date_raw',
                                      'code_raw',
                                      'code_system_raw',
                                      'provider_id'])\
                     .persist(StorageLevel.MEMORY_AND_DISK)
+                    # .withColumn('error', validate_row(
+                    #                        col('code'),
+                    #                        col('code_raw'),
+                    #                        col('code_system'),
+                    #                        col('code_system_raw'),
+                    #                        col('revenue_code'),
+                    #                        col('revenue_code_raw'),
+                    #                        col('start_date'),
+                    #                        col('start_date_raw'),
+                    #                        col('to_date'),
+                    #                        col('to_date_raw'),
+                    #                        col('id')))\
+                    # .withColumn('is_valid', is_valid(col('error')))\
+
+
+# .withColumn('warning', get_warnings())\
+# .withColumn('has_warnings', has_warnings(col('warning')))\
+
 
 
 save_procedure(proc_df, generate_output_path('procedure'))
-save_procedure_modifiers(proc_df, generate_output_path('proceduremodifier'))
+save_procedure_modifiers(proc_df, generate_output_path('procedure_modifier'))
 save_errors(proc_df, PROCEDURE, generate_output_path('error'))

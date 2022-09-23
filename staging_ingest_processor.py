@@ -204,8 +204,8 @@ print('------------------------>>>>>>> created patient_claims_raw_rdd')
 
 ### create procedure
 procedure_df = to_procedure(raw_claim_df.rdd, ref_lookup).persist(StorageLevel.MEMORY_AND_DISK)
-# save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
-# save_procedure_modifiers(procedure_df.rdd, generate_output_path('proceduremodifier'))
+save_errors(procedure_df, PROCEDURE, generate_output_path('error'))
+save_procedure_modifiers(procedure_df, generate_output_path('proceduremodifier'))
 # currated_df = procedure_rdd.toDF(stage_procedure_schema).persist(StorageLevel.MEMORY_AND_DISK)
 save_procedure(procedure_df, generate_output_path('procedure'))
 # procedure_df.unpersist(False)
@@ -489,7 +489,7 @@ print('------------------------>>>>>>> saved procs')
 #
 #                     # .withColumn('start_date', to_date(col('SVC_FR_DT'), 'SVC_FR_DT')).show()
 #
-#                         .withColumn('code', check_code(col('PRC_CD'), col('PRC_VERS_TYP_ID'))) \
+#                         .withColumn('code', cdxfb hheck_code(col('PRC_CD'), col('PRC_VERS_TYP_ID'))) \
 #                         .withColumn('code_system', get_code_system(col('PRC_CD'), col('PRC_VERS_TYP_ID')))\
 #                         .withColumn('error', test_row(col('SVC_FR_DT'), col('SVC_TO_DT'), col('PRC_CD'), col('PRC_VERS_TYP_ID')))
 #
