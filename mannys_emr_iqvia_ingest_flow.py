@@ -225,13 +225,13 @@ TO_CURATED_SPARK_STEPS = [
                      # '--conf',
                      # f'spark.yarn.heterogeneousExecutors.enabled=false',
                      #
-                     # '--conf',
-                     # f'spark.sql.shuffle.partitions=816',
+                     '--conf',
+                     f'spark.sql.shuffle.partitions=10000',
 
                      '--py-files',
                      '/home/hadoop/iqvia.zip,/home/hadoop/common.zip',
                      
-                     '/home/hadoop/staging_ingest_processor_df.py'
+                     '/home/hadoop/staging_ingest_processor.py'
                      ]
         }
     }

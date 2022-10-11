@@ -222,14 +222,6 @@ def to_problem(claim_rdd: RDD, ref_lookup, df_partition_size=6000) -> DataFrame:
     return claim_rdd \
         .map(lambda r: _to_problem_row(r, ref_lookup)) \
         .toDF(stage_problem_schema) \
-        .repartition(df_partition_size, 'source_consumer_id',
-                     'start_date',
-                     'code_raw',
-                     'code_system_raw') \
-        .sortWithinPartitions('source_consumer_id',
-                              'start_date',
-                              'code_raw',
-                              'code_system_raw') \
         .dropDuplicates(['source_consumer_id',
                          'start_date',
                          'code_raw',
@@ -295,14 +287,6 @@ def to_admitting_diagnosis(claim_rdd: RDD, df_partition_size=6000) -> DataFrame:
     return claim_rdd.filter(lambda r: r.ADMS_DIAG_CD is not None) \
         .map(lambda r: _to_admitting_diagnosis(r)) \
         .toDF(stage_problem_schema) \
-        .repartition(df_partition_size, 'source_consumer_id',
-                     'start_date',
-                     'code_raw',
-                     'code_system_raw') \
-        .sortWithinPartitions('source_consumer_id',
-                              'start_date',
-                              'code_raw',
-                              'code_system_raw') \
         .dropDuplicates(['source_consumer_id',
                          'start_date',
                          'code_raw',
@@ -380,14 +364,6 @@ def to_drug(claim_rdd: RDD, ref_lookup, df_partition_size=6000) -> DataFrame:
         .filter(lambda r: r.NDC_CD is not None) \
         .map(lambda r: _to_drug_row(r, ref_lookup)) \
         .toDF(stage_drug_schema) \
-        .repartition(df_partition_size, 'source_consumer_id',
-                     'start_date',
-                     'code_raw',
-                     'code_system_raw') \
-        .sortWithinPartitions('source_consumer_id',
-                              'start_date',
-                              'code_raw',
-                              'code_system_raw') \
         .dropDuplicates(['source_consumer_id',
                          'start_date',
                          'code_raw',
@@ -457,11 +433,6 @@ def to_patient(patient_plan_rdd: RDD) -> DataFrame:
         .map(lambda r: _to_patient_row(r)) \
         .toDF(stage_patient_schema) \
         .dropDuplicates(['source_consumer_id']) \
-        # .persist(StorageLevel.MEMORY_AND_DISK)
-    # .keyBy(lambda r: (r.source_consumer_id)) \
-    # .repartitionAndSortWithinPartitions(6000, lambda k: k[0]) \
-    # .reduceByKey((lambda a, b: a))\
-    # .map(lambda r: r[1])\
 
 
 # rdd = sc.parallelize([(0, 5), (3, 8), (2, 6), (0, 8), (3, 8), (1, 3)])
@@ -525,18 +496,10 @@ def _to_cost_row(claim_row: Row) -> Row:
     return cost_row
 
 
-def to_cost(claim_row_rdd: RDD, df_partition_size=6000) -> DataFrame:
+def to_cost(claim_row_rdd: RDD) -> DataFrame:
     return claim_row_rdd \
         .map(lambda r: _to_cost_row(r)) \
         .toDF(stage_cost_schema) \
-        .repartition(df_partition_size, 'source_consumer_id',
-                     'claim_identifier',
-                     'service_number',
-                     'paid_amount') \
-        .sortWithinPartitions('source_consumer_id',
-                              'claim_identifier',
-                              'service_number',
-                              'paid_amount') \
         .dropDuplicates(['source_consumer_id',
                          'claim_identifier',
                          'service_number',
@@ -622,14 +585,10 @@ def _to_claim_row(claim_row: Row, ref_lookup) -> Row:
     return claim_stage_row
 
 
-def to_claim(claim_raw: RDD, ref_lookup, df_partition_size=6000) -> DataFrame:
+def to_claim(claim_raw: RDD, ref_lookup) -> DataFrame:
     return claim_raw\
         .map(lambda r: _to_claim_row(r, ref_lookup)) \
         .toDF(stage_claim_schema) \
-        .repartition(df_partition_size, 'source_consumer_id',
-                     'claim_identifier') \
-        .sortWithinPartitions('source_consumer_id',
-                              'claim_identifier') \
         .dropDuplicates(['source_consumer_id',
                          'claim_identifier'])
 
@@ -738,12 +697,10 @@ def _to_practitioner_row(claim_row: Row, ref_lookup) -> Row:
     return providers
 
 
-def to_practitioner(claim_rdd: RDD, ref_lookup, df_partition_size=6000) -> DataFrame:
+def to_practitioner(claim_rdd: RDD, ref_lookup) -> DataFrame:
     return claim_rdd\
         .flatMap(lambda r: _to_practitioner_row(r, ref_lookup))\
         .toDF(stage_provider_schema)\
-        .repartition(df_partition_size, 'source_provider_id', 'provider_type') \
-        .sortWithinPartitions('source_provider_id', 'provider_type') \
         .dropDuplicates(['source_provider_id', 'provider_type'])
 
 
