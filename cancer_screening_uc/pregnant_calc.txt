@@ -1,0 +1,15 @@
+patientAge >= PREGNANCY_AGE_THRESHOLD && patientAge <= PREGNANCY_UPPER_AGE_THRESHOLD_LIBERAL
+check for HYSTERECTOMY procedure
+check for Diagnosis of MENOPAUSE
+
+check for a Diagnosis of PREGNANCY within a MaxDaysOfPregnancy
+or
+check for Procedure of FETAL_MONITORING within a MaxDaysOfPregnancy
+or
+check for Procedure FETAL_IMAGING within a MaxDaysOfPregnancy
+or
+has positive pregnancy lab within a MaxDaysOfPregnancy (HCG trend)
+
+DELIVERY or ABORTION within a MaxDaysOfPregnancy
+
+Gender is F

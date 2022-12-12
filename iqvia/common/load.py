@@ -6,7 +6,7 @@ from pyspark.sql.types import StructType
 # import findspark
 
 
-def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimiter='|', file_header=True,
+def load_df(spark: SparkSession, load_path: str, schema, file_delimiter='|', file_header=True,
             infer_schema=False, format_type='csv'):
     if format_type == 'csv':
         if not infer_schema:
@@ -20,6 +20,8 @@ def load_df(spark: SparkSession, load_path: str, schema: StructType, file_delimi
                 .csv(load_path)
     elif format_type == 'parquet':
         return spark.read.parquet(load_path)
+    elif format_type == 'delta':
+        return spark.read.format('delta').table(load_path)
 
 
 def load_plan(spark: SparkSession, load_path: str, schema: StructType, format_type):

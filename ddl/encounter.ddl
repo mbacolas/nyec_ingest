@@ -130,6 +130,24 @@ CREATE EXTERNAL TABLE drug(
 
 
 CREATE EXTERNAL TABLE lab (
+    id INT identity(1,1) NOT NULL,
+    source_consumer_id TEXT  NOT NULL,
+    source_org_oid TEXT  NOT NULL,
+    encounter_id TEXT,
+    start_date DATETIME  NOT NULL,
+    end_date DATETIME,
+    code TEXT  NOT NULL,
+    code_system TEXT  NOT NULL,
+    desc TEXT,
+    source_desc TEXT,
+    unit TEXT,
+    result_string TEXT,
+    result_boolean BOOLEAN,
+    result_numeric NUMBER,
+    interpretation TEXT,
+    note TEXT,
+    body_site TEXT,
+    method TEXT
 )
 
 CREATE EXTERNAL TABLE ref_range (
