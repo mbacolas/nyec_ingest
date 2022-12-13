@@ -9,7 +9,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from cancer_screening_uc.validation import *
-
+from pyspark import StorageLevel
 
 spark = SparkSession.builder \
                     .appName("Demo") \
@@ -117,33 +117,30 @@ def is_valid(error):
     else:
         return True
 
-no_match_df = joined_mpi_df.withColumn('fuzzy_error', fuzzy_validation(col('MPIID'.upper()),
-                                                                 col('smpi_phone'.upper()),
-                                                                 col('smpi_first_name'.upper()),
-                                                                 col('smpi_last_name'.upper()),
-                                                                 col('smpi_street_1'.upper()),
-                                                                 col('smpi_city'.upper()),
-                                                                 col('smpi_state'.upper()),
-                                                                 col('smpi_zipcode'.upper()),
-                                                                 col('smpi_gender'.upper()),
-                                                                 col('smpi_dob'.upper()),
-                                                                 col('smpi_ssn'.upper()),
-                                                                 col('MPI_ID'.upper()),
-                                                                 col('smpi_day_phone'.upper()),
-                                                                 col('smpi_night_phone'.upper()),
-                                                                 col('hixny_first_name'.upper()),
-                                                                 col('hixny_last_name'.upper()),
-                                                                 col('hixny_street_1'.upper()),
-                                                                 col('hixny_city'.upper()),
-                                                                 col('hixny_state'.upper()),
-                                                                 col('hixny_zipcode'.upper()),
-                                                                 col('hixny_gender'.upper()),
-                                                                 col('hixny_dob'.upper()),
-                                                                 col('hixny_ssn'.upper())
-                                                                ))\
-                            .withColumn('is_fuzzy_valid', is_valid(col('fuzzy_error')))
+score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
+                                                     col('smpi_first_name'.upper()),
+                                                     col('smpi_last_name'.upper()),
+                                                     col('smpi_street_1'.upper()),
+                                                     col('smpi_city'.upper()),
+                                                     col('smpi_state'.upper()),
+                                                     col('smpi_zipcode'.upper()),
+                                                     col('smpi_gender'.upper()),
+                                                     col('smpi_dob'.upper()),
+                                                     col('smpi_ssn'.upper()),
+                                                     col('smpi_day_phone'.upper()),
+                                                     col('smpi_night_phone'.upper()),
+                                                     col('hixny_first_name'.upper()),
+                                                     col('hixny_last_name'.upper()),
+                                                     col('hixny_street_1'.upper()),
+                                                     col('hixny_city'.upper()),
+                                                     col('hixny_state'.upper()),
+                                                     col('hixny_zipcode'.upper()),
+                                                     col('hixny_gender'.upper()),
+                                                     col('hixny_dob'.upper()),
+                                                     col('hixny_ssn'.upper()))).persist(StorageLevel.MEMORY_AND_DISK)
 
-no_match_df.show()
+score_df.unpersist()
+score_df.show()
 
 import editdistance
 editdistance.eval('Joaane', 'Joane')
