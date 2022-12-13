@@ -151,6 +151,18 @@ def score(smpi_phone,
                 .replace(' dr', '')
         else:
             return street
+    def check_sound(str1: str, str2: str) -> str:
+        if str1 is not None and str2 is not None and str1.strip() > 1 and str2.strip()> 1:
+            same = False
+            try:
+                same = phonetics.soundex(str1) == phonetics.soundex(str2)
+            except Exception as err:
+                print(f'------------->>> {err} : str1: {str1} and str2: {str2}')
+                return False
+            else:
+                return same
+        else:
+            return False
 
     # def edit_distance(str1: str, str2: str) -> int:
     #     return editdistance.eval(str1, str2)
@@ -177,7 +189,7 @@ def score(smpi_phone,
     if (smpi_first_name is not None and hixny_first_name is not None and \
         len(smpi_first_name.strip()) > 3 and len(hixny_first_name.strip()) > 3) and \
         (smpi_first_name == hixny_first_name or \
-            phonetics.soundex(smpi_first_name) == phonetics.soundex(hixny_first_name) or \
+            check_sound(smpi_first_name, hixny_first_name) or \
             editdistance.eval(smpi_first_name, hixny_first_name) <= 2):
         score += 5
 
