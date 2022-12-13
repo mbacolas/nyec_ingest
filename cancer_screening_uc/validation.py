@@ -58,6 +58,56 @@ def fuzzy_validation(smpi_first_name,
     return json.dumps(validation_errors)
 
 
+@udf(returnType=IntegerType())
+def completeness(smpi_phone,
+                  smpi_first_name,
+                  smpi_last_name,
+                  smpi_street_1,
+                  smpi_city,
+                  smpi_state,
+                  smpi_zipcode,
+                  smpi_gender,
+                  smpi_dob,
+                  smpi_ssn,
+                  smpi_day_phone,
+                  smpi_night_phone,
+                  hixny_first_name,
+                  hixny_last_name,
+                  hixny_street_1,
+                  hixny_city,
+                  hixny_state,
+                  hixny_zipcode,
+                  hixny_gender,
+                  hixny_dob,
+                  hixny_ssn):
+    completeness = 10
+    def null_check(value: str):
+        if value is None or value in ('NULL', 'null') or len(value.strip()) == 0:
+            return None
+        else:
+            return value
+    if null_check(smpi_first_name) is None or null_check(hixny_first_name) is None:
+        completeness -= 1
+    if null_check(smpi_last_name) is None or null_check(hixny_last_name) is None:
+        completeness -= 1
+    if null_check(smpi_street_1) is None or null_check(hixny_street_1) is None:
+        completeness -= 1
+    if null_check(smpi_city) is None or null_check(hixny_city) is None:
+        completeness -= 1
+    if null_check(smpi_state) is None or null_check(hixny_state) is None:
+        completeness -= 1
+    if null_check(smpi_zipcode) is None or null_check(hixny_zipcode) is None:
+        completeness -= 1
+    if null_check(smpi_phone) is None or (null_check(smpi_day_phone) and null_check(smpi_night_phone)) is None:
+        completeness -= 1
+    if null_check(smpi_gender) is None or null_check(hixny_gender) is None:
+        completeness -= 1
+    if null_check(smpi_dob) is None or null_check(hixny_dob) is None:
+        completeness -= 1
+    if null_check(smpi_ssn) is None or null_check(hixny_ssn) is None:
+        completeness -= 1
+    return completeness
+
 
 @udf(returnType=IntegerType())
 def score(smpi_phone,
@@ -80,28 +130,44 @@ def score(smpi_phone,
           hixny_zipcode,
           hixny_gender,
           hixny_dob,
-          hixny_ssn) -> int:
+          hixny_ssn):
     import editdistance
     import phonetics
     score = 0
-    # first name	5
-    # last name	15
-    # street 1	15
-    # city	10
-    # state	5
-    # zip	10
-    # phone	10
-    # gender	5
-    # dob	10
-    # ssn	15
+
+    # first name	5 ,1
+    # last name	15 ,2
+    # street 1	15 ,3
+    # city	10 ,4
+    # state	5 ,5
+    # zip	10 ,6
+    # phone	10 ,7
+    # gender	5 ,8
+    # dob	10 ,9
+    # ssn	15 ,10
+
+    def standardize_dob(dob: str) -> str:
+        if dob in ('NULL', 'null'):
+            dob = None
+
+        if dob is not None and len(dob) >= 10:
+            return dob.split(' ')[0]
+        else:
+            return dob
 
     def standardize_zip(zip: str) -> str:
+        if zip in ('NULL', 'null'):
+            zip = None
+
         if zip is not None and len(zip) >= 5:
             return zip.lower()[0:5]
         else:
             return zip
 
     def standardize_phone(phone: str) -> str:
+        if phone in ('NULL', 'null'):
+            phone = None
+
         if phone is not None:
             return phone.lower() \
                 .replace('-', '') \
@@ -113,6 +179,9 @@ def score(smpi_phone,
             return phone
 
     def standardize_ssn(ssn: str) -> str:
+        if ssn in ('NULL', 'null'):
+            ssn = None
+
         if ssn is not None:
             return ssn.lower() \
                 .replace('-', '') \
@@ -121,6 +190,9 @@ def score(smpi_phone,
             return ssn
 
     def standardize_gender(gender: str) -> str:
+        if gender in ('NULL', 'null'):
+            gender = None
+
         if gender is not None:
             return gender.lower() \
                 .replace('female', 'F') \
@@ -129,12 +201,18 @@ def score(smpi_phone,
             return gender
 
     def standardize_state(state: str) -> str:
+        if state in ('NULL', 'null'):
+            state = None
+
         if state is not None:
             return state.lower().replace('new york', 'NY')
         else:
             return state
 
     def standardize_street(street: str) -> str:
+        if street in ('NULL', 'null'):
+            street = None
+
         if street is not None:
             return street.lower() \
                 .replace(' ', '') \
@@ -165,12 +243,18 @@ def score(smpi_phone,
             return False
 
     def standardize_first_name(name: str) -> str:
+        if name in ('NULL', 'null'):
+            name = None
+
         if name is not None:
             return name.split(' ')[0].lower().strip().replace('-', '').replace('\'', '').replace('`', '')
         else:
             return name
 
     def to_lower(value: str) -> str:
+        if value in ('NULL', 'null'):
+            value = None
+
         if value is not None:
             return value.lower().strip()
         else:
@@ -178,6 +262,9 @@ def score(smpi_phone,
     # def edit_distance(str1: str, str2: str) -> int:
     #     return editdistance.eval(str1, str2)
     #
+    smpi_dob = standardize_dob(smpi_dob)
+    hixny_dob = standardize_dob(hixny_dob)
+
     smpi_street_1 = standardize_street(smpi_street_1)
     hixny_street_1 = standardize_street(hixny_street_1)
 

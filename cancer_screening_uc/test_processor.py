@@ -139,6 +139,27 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
                                                      col('hixny_zipcode'.upper()),
                                                      col('hixny_gender'.upper()),
                                                      col('hixny_dob'.upper()),
+                                                     col('hixny_ssn'.upper())))\
+                    .withColumn('completeness', completeness(col('smpi_phone'.upper()),
+                                                     col('smpi_first_name'.upper()),
+                                                     col('smpi_last_name'.upper()),
+                                                     col('smpi_street_1'.upper()),
+                                                     col('smpi_city'.upper()),
+                                                     col('smpi_state'.upper()),
+                                                     col('smpi_zipcode'.upper()),
+                                                     col('smpi_gender'.upper()),
+                                                     col('smpi_dob'.upper()),
+                                                     col('smpi_ssn'.upper()),
+                                                     col('smpi_day_phone'.upper()),
+                                                     col('smpi_night_phone'.upper()),
+                                                     col('hixny_first_name'.upper()),
+                                                     col('hixny_last_name'.upper()),
+                                                     col('hixny_street_1'.upper()),
+                                                     col('hixny_city'.upper()),
+                                                     col('hixny_state'.upper()),
+                                                     col('hixny_zipcode'.upper()),
+                                                     col('hixny_gender'.upper()),
+                                                     col('hixny_dob'.upper()),
                                                      col('hixny_ssn'.upper())))
 
     # .persist(StorageLevel.MEMORY_AND_DISK)
@@ -165,7 +186,6 @@ from fuzzywuzzy import process
 print(fuzz.ratio("this is a test", "this is a test!"))
 print(fuzz.ratio("2010-01-01", "2010-01-02"))
 print(fuzz.ratio("22 27 35 street", "22-27 35 street"))
-print(fuzz.ratio("22 27 35 street", "22-27 35 st"))
 print(fuzz.partial_ratio("22 27 35 street", "22-27 35 st"))
 fuzz.partial_ratio("YANKEES", "NEW YORK YANKEES")
 
