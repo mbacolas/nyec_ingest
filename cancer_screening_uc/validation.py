@@ -164,6 +164,12 @@ def score(smpi_phone,
         else:
             return False
 
+    def standardize_first_name(name: str) -> str:
+        if name is not None:
+            return name.split(' ')[0].lower().strip()
+        else:
+            return name
+
     def to_lower(value: str) -> str:
         if value is not None:
             return value.lower().strip()
@@ -191,8 +197,8 @@ def score(smpi_phone,
     smpi_day_phone = standardize_phone(smpi_day_phone)
     smpi_night_phone = standardize_phone(smpi_night_phone)
 
-    smpi_first_name = to_lower(smpi_first_name)
-    hixny_first_name = to_lower(hixny_first_name)
+    smpi_first_name = standardize_first_name(smpi_first_name)
+    hixny_first_name = standardize_first_name(hixny_first_name)
     smpi_last_name = to_lower(smpi_last_name)
     hixny_last_name = to_lower(hixny_last_name)
     smpi_city = to_lower(smpi_city)
