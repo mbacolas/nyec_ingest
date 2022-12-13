@@ -117,6 +117,7 @@ def is_valid(error):
     else:
         return True
 
+
 score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
                                                      col('smpi_first_name'.upper()),
                                                      col('smpi_last_name'.upper()),
@@ -141,6 +142,9 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
 
 score_df.unpersist()
 score_df.show()
+score_df.coalesce(1).write.csv("/tmp/spark_output/datacsv")
+df.coalesce(1).write.csv("address")
+score_df.coalesce(1).write().mode(SaveMode.Overwrite).csv("/tmp/spark_output/datacsv")
 
 import editdistance
 editdistance.eval('Joaane', 'Joane')

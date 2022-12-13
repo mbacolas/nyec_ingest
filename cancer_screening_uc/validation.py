@@ -80,7 +80,7 @@ def score(smpi_phone,
           hixny_zipcode,
           hixny_gender,
           hixny_dob,
-          hixny_ssn):
+          hixny_ssn) -> int:
     import editdistance
     import phonetics
     score = 0
@@ -152,7 +152,7 @@ def score(smpi_phone,
         else:
             return street
     def check_sound(str1: str, str2: str) -> str:
-        if str1 is not None and str2 is not None and str1.strip() > 1 and str2.strip()> 1:
+        if str1 is not None and str2 is not None and len(str1.strip()) > 1 and len(str2.strip()) > 1:
             same = False
             try:
                 same = phonetics.soundex(str1) == phonetics.soundex(str2)
@@ -164,6 +164,11 @@ def score(smpi_phone,
         else:
             return False
 
+    def to_lower(value: str) -> str:
+        if value is not None:
+            return value.lower().strip()
+        else:
+            return value
     # def edit_distance(str1: str, str2: str) -> int:
     #     return editdistance.eval(str1, str2)
     #
@@ -186,11 +191,17 @@ def score(smpi_phone,
     smpi_day_phone = standardize_phone(smpi_day_phone)
     smpi_night_phone = standardize_phone(smpi_night_phone)
 
+    smpi_first_name = to_lower(smpi_first_name)
+    hixny_first_name = to_lower(hixny_first_name)
+    smpi_last_name = to_lower(smpi_last_name)
+    hixny_last_name = to_lower(hixny_last_name)
+    smpi_city = to_lower(smpi_city)
+
     if (smpi_first_name is not None and hixny_first_name is not None and \
-        len(smpi_first_name.strip()) > 3 and len(hixny_first_name.strip()) > 3) and \
-        (smpi_first_name == hixny_first_name or \
-            check_sound(smpi_first_name, hixny_first_name) or \
-            editdistance.eval(smpi_first_name, hixny_first_name) <= 2):
+        len(smpi_first_name) > 1 and len(hixny_first_name) > 1) and \
+        (smpi_first_name == hixny_first_name or
+         check_sound(smpi_first_name, hixny_first_name) or
+         editdistance.eval(smpi_first_name, hixny_first_name) <= 2):
         score += 5
 
     if (smpi_last_name is not None and hixny_last_name is not None) and \
