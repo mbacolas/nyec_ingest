@@ -10,7 +10,8 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from cancer_screening_uc.validation import *
 from pyspark import StorageLevel
-
+from validation import score
+from cancer_screening_uc.validation import score
 spark = SparkSession.builder \
                     .appName("Demo") \
                     .getOrCreate()
@@ -138,7 +139,9 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
                                                      col('hixny_zipcode'.upper()),
                                                      col('hixny_gender'.upper()),
                                                      col('hixny_dob'.upper()),
-                                                     col('hixny_ssn'.upper()))).persist(StorageLevel.MEMORY_AND_DISK)
+                                                     col('hixny_ssn'.upper())))
+
+    # .persist(StorageLevel.MEMORY_AND_DISK)
 
 score_df.unpersist()
 score_df.show()

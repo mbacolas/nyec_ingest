@@ -166,7 +166,7 @@ def score(smpi_phone,
 
     def standardize_first_name(name: str) -> str:
         if name is not None:
-            return name.split(' ')[0].lower().strip()
+            return name.split(' ')[0].lower().strip().replace('-', '').replace('\'', '').replace('`', '')
         else:
             return name
 
