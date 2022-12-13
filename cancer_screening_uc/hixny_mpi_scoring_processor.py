@@ -1,20 +1,13 @@
 from pyspark.sql import SparkSession
-from pyspark.context import SparkContext
-from pyspark.conf import SparkConf
-import uuid
-from datetime import datetime
-from iqvia.common.schema import *
-from pyspark.sql.functions import current_date, datediff, months_between, years
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
-from cancer_screening_uc.validation import *
-from pyspark import StorageLevel
-from validation import score
-from cancer_screening_uc.validation import score
-spark = SparkSession.builder \
-                    .appName("Demo") \
-                    .getOrCreate()
+from cancer_screening_uc.matching.validation import *
+
+spark = SparkSession \
+    .builder \
+    .appName("Patient_Matching") \
+    .config("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+    .config("fs.s3a.sse.enabled", True) \
+    .config("fs.s3a.server-side-encryption-algorithm", "SSE-KMS") \
+    .getOrCreate()
 
 conf = spark.conf
 
@@ -64,9 +57,11 @@ smpi_schema = StructType([ \
     StructField("ssn", StringType(), False)
 ])
 
-
-hixny_mpi_load_path = '/Users/emmanuel.bacolas/Downloads/iIT2163_Hixny_Data_20221010.csv'
-smpi_load_path = '/Users/emmanuel.bacolas/Downloads/MPIID_with_demographics_20220926.csv'
+hixny_mpi_load_path = conf.get("spark.hixny.hixny_mpi")
+smpi_load_path = conf.get("spark.nyec.nyec_hixny_mpi")
+output_path = conf.get("spark.nyec.adhoc.hixny_matching_score")
+# hixny_mpi_load_path = '/Users/emmanuel.bacolas/Downloads/iIT2163_Hixny_Data_20221010.csv'
+# smpi_load_path = '/Users/emmanuel.bacolas/Downloads/MPIID_with_demographics_20220926.csv'
 
 # MPI_ID|First_Name|Middle_Name|Last_Name|Address_1|Address_2|city|state|zipcode|DayPhoneNumber|NightPhoneNumber|Gender|DOB|SSN
 hixny_mpi_df = spark.read \
@@ -87,9 +82,6 @@ hixny_mpi_df = spark.read \
                    .withColumnRenamed('DOB', 'hixny_dob')\
                    .withColumnRenamed('SSN', 'hixny_ssn')
 
-
-hixny_mpi_df.first()
-
 smpi_df = spark.read \
                    .schema(smpi_schema) \
                    .options(inferSchema=False, delimiter=',', header=True) \
@@ -107,16 +99,6 @@ smpi_df = spark.read \
 
 joined_mpi_df = smpi_df.join(hixny_mpi_df, how='inner')\
                         .where((smpi_df['MPIID']==hixny_mpi_df['MPI_ID']))
-
-
-@udf(returnType=BooleanType())
-def is_valid(error):
-    import json
-    e = json.loads(error)
-    if len(e) > 0:
-        return False
-    else:
-        return True
 
 
 score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
@@ -164,32 +146,33 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
 
     # .persist(StorageLevel.MEMORY_AND_DISK)
 
-score_df.unpersist()
-score_df.show()
-score_df.coalesce(1).write.csv("/tmp/spark_output/datacsv")
-df.coalesce(1).write.csv("address")
-score_df.coalesce(1).write().mode(SaveMode.Overwrite).csv("/tmp/spark_output/datacsv")
+# score_df.unpersist()
+# score_df.show()
+score_df.coalesce(1).write.mode("overwrite").csv(output_path)
+# score_df.coalesce(1).write.csv("/tmp/spark_output/datacsv")
+# df.coalesce(1).write.csv("address")
+# score_df.coalesce(1).write().mode(SaveMode.Overwrite).csv("/tmp/spark_output/datacsv")
 
-import editdistance
-editdistance.eval('Joaane', 'Joane')
-
-import editdistance
-import phonetics
-print(phonetics.soundex('Jooaaane'))
-print(phonetics.soundex('Joane'))
-
-print(phonetics.dmetaphone('Manny'))
-print(phonetics.dmetaphone('Many'))
-
-from fuzzywuzzy import fuzz
-from fuzzywuzzy import process
-print(fuzz.ratio("this is a test", "this is a test!"))
-print(fuzz.ratio("2010-01-01", "2010-01-02"))
-print(fuzz.ratio("22 27 35 street", "22-27 35 street"))
-print(fuzz.partial_ratio("22 27 35 street", "22-27 35 st"))
-fuzz.partial_ratio("YANKEES", "NEW YORK YANKEES")
+# import editdistance
+# editdistance.eval('Joaane', 'Joane')
+#
+# import editdistance
+# import phonetics
+# print(phonetics.soundex('Jooaaane'))
+# print(phonetics.soundex('Joane'))
+#
+# print(phonetics.dmetaphone('Manny'))
+# print(phonetics.dmetaphone('Many'))
+#
+# from fuzzywuzzy import fuzz
+# from fuzzywuzzy import process
+# print(fuzz.ratio("this is a test", "this is a test!"))
+# print(fuzz.ratio("2010-01-01", "2010-01-02"))
+# print(fuzz.ratio("22 27 35 street", "22-27 35 street"))
+# print(fuzz.partial_ratio("22 27 35 street", "22-27 35 st"))
+# fuzz.partial_ratio("YANKEES", "NEW YORK YANKEES")
 
 # source ~/projects/nyec_ingest/venv/bin/activate
 # export JAVA_HOME=/Users/emmanuel.bacolas/.sdkman/candidates/java/current/
-bin/spark-submit  --master spark://127.0.0.1 --conf spark.driver.cores=5 --conf spark.executor.cores=5  --conf spark.driver.memory=1g --conf spark.executor.memory=8g  --py-files /Users/emmanuel.bacolas/projects/nyec_ingest/iqvia.zip,/Users/emmanuel.bacolas/projects/nyec_ingest/common.zip --jars /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar /Users/emmanuel.bacolas/projects/nyec_ingest/staging_ingest_processor.py
+# bin/spark-submit  --master spark://127.0.0.1 --conf spark.driver.cores=5 --conf spark.executor.cores=5  --conf spark.driver.memory=1g --conf spark.executor.memory=8g  --py-files /Users/emmanuel.bacolas/projects/nyec_ingest/iqvia.zip,/Users/emmanuel.bacolas/projects/nyec_ingest/common.zip --jars /Users/emmanuel.bacolas/Downloads/postgresql-42.4.0.jar /Users/emmanuel.bacolas/projects/nyec_ingest/staging_ingest_processor.py
 # bin/pyspark  --conf spark.driver.cores=2 --conf spark.executor.cores=8  --conf spark.driver.memory=1g --conf spark.executor.memory=10g --py-files /Users/emmanuel.bacolas/projects/nyec_ingest/cancer_screening_uc.zip
