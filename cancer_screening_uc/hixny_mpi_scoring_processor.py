@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from cancer_screening_uc.matching.validation import *
+from matching.validation import *
 
 spark = SparkSession \
     .builder \
@@ -58,7 +58,8 @@ smpi_schema = StructType([ \
 ])
 
 hixny_mpi_load_path = conf.get("spark.hixny.hixny_mpi")
-smpi_load_path = conf.get("spark.nyec.nyec_hixny_mpi")
+smpi_load_path = conf.get("spark.hixny.nyec_hixny_mpi")
+
 output_path = conf.get("spark.nyec.adhoc.hixny_matching_score")
 # hixny_mpi_load_path = '/Users/emmanuel.bacolas/Downloads/iIT2163_Hixny_Data_20221010.csv'
 # smpi_load_path = '/Users/emmanuel.bacolas/Downloads/MPIID_with_demographics_20220926.csv'
@@ -70,8 +71,8 @@ hixny_mpi_df = spark.read \
                    .csv(hixny_mpi_load_path)\
                    .drop('Middle_Name')\
                    .drop('Address_2')\
-                   .withColumnRenamed('DayPhoneNumber', 'smpi_day_phone')\
-                   .withColumnRenamed('NightPhoneNumber', 'smpi_night_phone')\
+                   .withColumnRenamed('DayPhoneNumber', 'hixny_day_phone')\
+                   .withColumnRenamed('NightPhoneNumber', 'hixny_night_phone')\
                    .withColumnRenamed('Address_1', 'hixny_street_1')\
                    .withColumnRenamed('First_Name', 'hixny_first_name')\
                    .withColumnRenamed('Last_Name', 'hixny_last_name')\
@@ -97,9 +98,12 @@ smpi_df = spark.read \
                    .withColumnRenamed('zipcode', 'smpi_zipcode') \
                    .withColumnRenamed('SSN', 'smpi_ssn')
 
+smpi_df.show()
+
 joined_mpi_df = smpi_df.join(hixny_mpi_df, how='inner')\
                         .where((smpi_df['MPIID']==hixny_mpi_df['MPI_ID']))
 
+joined_mpi_df.show()
 
 score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
                                                      col('smpi_first_name'.upper()),
@@ -111,8 +115,8 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
                                                      col('smpi_gender'.upper()),
                                                      col('smpi_dob'.upper()),
                                                      col('smpi_ssn'.upper()),
-                                                     col('smpi_day_phone'.upper()),
-                                                     col('smpi_night_phone'.upper()),
+                                                     col('hixny_day_phone'.upper()),
+                                                     col('hixny_night_phone'.upper()),
                                                      col('hixny_first_name'.upper()),
                                                      col('hixny_last_name'.upper()),
                                                      col('hixny_street_1'.upper()),
@@ -132,8 +136,8 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
                                                      col('smpi_gender'.upper()),
                                                      col('smpi_dob'.upper()),
                                                      col('smpi_ssn'.upper()),
-                                                     col('smpi_day_phone'.upper()),
-                                                     col('smpi_night_phone'.upper()),
+                                                     col('hixny_day_phone'.upper()),
+                                                     col('hixny_night_phone'.upper()),
                                                      col('hixny_first_name'.upper()),
                                                      col('hixny_last_name'.upper()),
                                                      col('hixny_street_1'.upper()),
@@ -147,7 +151,8 @@ score_df = joined_mpi_df.withColumn('score', score(col('smpi_phone'.upper()),
     # .persist(StorageLevel.MEMORY_AND_DISK)
 
 # score_df.unpersist()
-# score_df.show()
+score_df.show()
+# score_df.coalesce(1).write.csv(output_path)
 score_df.coalesce(1).write.mode("overwrite").csv(output_path)
 # score_df.coalesce(1).write.csv("/tmp/spark_output/datacsv")
 # df.coalesce(1).write.csv("address")

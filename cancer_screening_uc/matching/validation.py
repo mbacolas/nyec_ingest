@@ -69,8 +69,8 @@ def completeness(smpi_phone,
                   smpi_gender,
                   smpi_dob,
                   smpi_ssn,
-                  smpi_day_phone,
-                  smpi_night_phone,
+                  hixny_day_phone,
+                  hixny_night_phone,
                   hixny_first_name,
                   hixny_last_name,
                   hixny_street_1,
@@ -98,7 +98,7 @@ def completeness(smpi_phone,
         completeness -= 1
     if null_check(smpi_zipcode) is None or null_check(hixny_zipcode) is None:
         completeness -= 1
-    if null_check(smpi_phone) is None or (null_check(smpi_day_phone) and null_check(smpi_night_phone)) is None:
+    if null_check(smpi_phone) is None or (null_check(hixny_day_phone) and null_check(hixny_night_phone)) is None:
         completeness -= 1
     if null_check(smpi_gender) is None or null_check(hixny_gender) is None:
         completeness -= 1
@@ -120,8 +120,8 @@ def score(smpi_phone,
           smpi_gender,
           smpi_dob,
           smpi_ssn,
-          smpi_day_phone,
-          smpi_night_phone,
+          hixny_day_phone,
+          hixny_night_phone,
           hixny_first_name,
           hixny_last_name,
           hixny_street_1,
@@ -281,8 +281,8 @@ def score(smpi_phone,
     hixny_ssn = standardize_ssn(hixny_ssn)
 
     smpi_phone = standardize_phone(smpi_phone)
-    smpi_day_phone = standardize_phone(smpi_day_phone)
-    smpi_night_phone = standardize_phone(smpi_night_phone)
+    smpi_day_phone = standardize_phone(hixny_day_phone)
+    smpi_night_phone = standardize_phone(hixny_night_phone)
 
     smpi_first_name = standardize_first_name(smpi_first_name)
     hixny_first_name = standardize_first_name(hixny_first_name)
